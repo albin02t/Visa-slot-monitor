@@ -27,13 +27,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Pull the LLM model
-
-```bash
-ollama pull gemma3:1b
-```
-
-### 4. Get your Telegram API credentials
+### 3. Get your Telegram API credentials
 
 1. Go to [my.telegram.org/apps](https://my.telegram.org/apps) and log in
 2. Create a new application (URL can be left blank or set to `https://localhost`)
