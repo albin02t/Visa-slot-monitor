@@ -3,6 +3,7 @@ import asyncio
 import logging
 import urllib.request
 import json
+from collections import defaultdict, deque
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -31,33 +32,36 @@ OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma3:1b")
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/chat")
 
 SYSTEM_PROMPT = (
-    "You monitor Telegram messages for US F1 student visa interview slot availability. "
-    "Reply YES only if the message is assertively and clearly announcing that visa interview slots are open RIGHT NOW and can be booked immediately. "
-    "The message must be a present-tense, confident declaration — someone saying slots are available now, just opened, or actively showing on the booking system. "
-    "Reply NO for everything else, including: "
-    "speculation or predictions about when slots might open, "
-    "past experiences or historical discussion, "
-    "questions asking if slots are open, "
-    "rumours or unverified claims, "
-    "complaints about no slots, "
-    "general tips or advice, "
-    "news about slots expected in the future, "
-    "or any message that is not a direct present-tense confirmation that slots are available to book right now. "
+    "You monitor a Telegram channel for US F1 student visa interview slot availability. "
+    "You will be given the last few messages from the channel as context, with the most recent message last. "
+    "Based on this conversation, decide if there is a clear, confident, present-tense confirmation that visa interview slots are open RIGHT NOW and available to book. "
+    "Reply YES only when the conversation makes it evident that slots are actively open and bookable at this moment — "
+    "for example, someone saying they can see dates on the booking system, slots just dropped, or urging others to book now. "
+    "Reply NO if the messages are: discussing when slots might open in the future, sharing past experiences, "
+    "asking questions, expressing uncertainty, spreading rumours, complaining about no slots, or giving general advice. "
+    "The context of earlier messages matters — a single ambiguous message in a thread of 'no slots' discussion should be NO. "
     "When in doubt, reply NO. Reply with exactly one word: YES or NO."
 )
 
 twilio = TwilioClient(TWILIO_SID, TWILIO_TOKEN)
 
+recent_messages: dict[str, deque] = defaultdict(lambda: deque(maxlen=5))
 
-def is_slot_alert(text: str) -> bool:
-    if not text or len(text.strip()) < 5:
+
+def is_slot_alert(channel: str, new_text: str) -> bool:
+    if not new_text or len(new_text.strip()) < 5:
         return False
+
+    recent_messages[channel].append(new_text)
+    history = list(recent_messages[channel])
+
+    context = "\n\n".join(f"[Message {i+1}]: {msg[:500]}" for i, msg in enumerate(history))
 
     payload = json.dumps({
         "model": OLLAMA_MODEL,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": text[:1000]},
+            {"role": "user", "content": context},
         ],
         "stream": False,
     }).encode()
@@ -118,7 +122,7 @@ async def main() -> None:
 
         log.info("[%s] New message: %s", channel_name, text[:120].replace("\n", " "))
 
-        if is_slot_alert(text):
+        if is_slot_alert(channel_name, text):
             log.info("SLOT ALERT detected in %s — sending WhatsApp notification", channel_name)
             try:
                 send_whatsapp_alert(channel_name, text)
