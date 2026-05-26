@@ -8,33 +8,38 @@ from dateutil import parser as dateparser
 
 log = logging.getLogger(__name__)
 
-CVS_API_KEY = os.environ.get("CVS_API_KEY")
 CVS_API_URL = "https://app.checkvisaslots.com/slots/v3"
-CVS_POLL_INTERVAL = int(os.environ.get("CVS_POLL_INTERVAL", "300"))  # seconds between polls
-CVS_LOCATIONS = [
-    loc.strip().upper()
-    for loc in os.environ.get("CVS_LOCATIONS", "").split(",")
-    if loc.strip()
-]  # empty = alert for all locations
-CVS_DURATION_DAYS = int(os.environ.get("CVS_DURATION_DAYS", "120"))
-
-CVS_HEADERS = {
-    "accept": "*/*",
-    "accept-language": "en-US,en;q=0.9",
-    "extversion": "4.6.5.1",
-    "origin": "chrome-extension://beepaenfejnphdgnkmccjcfiieihhogl",
-    "user-agent": (
-        "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
-        "(KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
-    ),
-    "x-api-key": CVS_API_KEY,
-}
 
 
-def _within_duration(date_str: str) -> bool:
+def _get_config():
+    api_key = os.environ.get("CVS_API_KEY")
+    if not api_key:
+        raise ValueError("CVS_API_KEY is not set in environment")
+    poll_interval = int(os.environ.get("CVS_POLL_INTERVAL", "300"))
+    locations = [
+        loc.strip().upper()
+        for loc in os.environ.get("CVS_LOCATIONS", "").split(",")
+        if loc.strip()
+    ]
+    duration_days = int(os.environ.get("CVS_DURATION_DAYS", "120"))
+    headers = {
+        "accept": "*/*",
+        "accept-language": "en-US,en;q=0.9",
+        "extversion": "4.6.5.1",
+        "origin": "chrome-extension://beepaenfejnphdgnkmccjcfiieihhogl",
+        "user-agent": (
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+            "(KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36"
+        ),
+        "x-api-key": api_key,
+    }
+    return poll_interval, locations, duration_days, headers
+
+
+def _within_duration(date_str: str, duration_days: int) -> bool:
     try:
         slot_date = dateparser.parse(date_str).date()
-        return slot_date <= (datetime.now().date() + timedelta(days=CVS_DURATION_DAYS))
+        return slot_date <= (datetime.now().date() + timedelta(days=duration_days))
     except Exception:
         return True
 
@@ -44,17 +49,18 @@ async def poll_checkvisaslots(on_slots_found) -> None:
     Polls checkvisaslots.com every CVS_POLL_INTERVAL seconds.
     Calls on_slots_found(summary_text) when new open slots are detected.
     """
+    poll_interval, locations, duration_days, headers = _get_config()
     log.info(
         "checkvisaslots.com poller started — interval %ds, locations: %s",
-        CVS_POLL_INTERVAL,
-        CVS_LOCATIONS or "all",
+        poll_interval,
+        locations or "all",
     )
     alerted_slots: set[str] = set()
 
     async with httpx.AsyncClient(timeout=30) as client:
         while True:
             try:
-                resp = await client.get(CVS_API_URL, headers=CVS_HEADERS)
+                resp = await client.get(CVS_API_URL, headers=headers)
                 resp.raise_for_status()
                 data = resp.json()
 
@@ -68,9 +74,9 @@ async def poll_checkvisaslots(on_slots_found) -> None:
                         continue
                     location = slot.get("visa_location", "").upper()
                     start_date = slot.get("start_date", "")
-                    if CVS_LOCATIONS and location not in CVS_LOCATIONS:
+                    if locations and location not in locations:
                         continue
-                    if start_date and not _within_duration(start_date):
+                    if start_date and not _within_duration(start_date, duration_days):
                         continue
                     open_slots.append(slot)
 
@@ -98,4 +104,4 @@ async def poll_checkvisaslots(on_slots_found) -> None:
             except Exception as e:
                 log.error("checkvisaslots.com poll failed: %s", e)
 
-            await asyncio.sleep(CVS_POLL_INTERVAL)
+            await asyncio.sleep(poll_interval)

@@ -1,6 +1,11 @@
 # Visa Slot Monitor
 
-Monitors Telegram channels for US F1 visa interview slot availability. Uses a local LLM (via Ollama) to read incoming messages and sends a WhatsApp alert via Twilio when slots are assertively confirmed as open right now.
+Monitors US F1 visa interview slot availability through two sources simultaneously:
+
+1. **checkvisaslots.com API** — polls every 5 minutes for confirmed open slots (primary source)
+2. **Telegram channels** — uses a local LLM to detect slot announcements in real-time (secondary source)
+
+Sends a WhatsApp alert via Twilio when slots are detected, with different messages depending on the source.
 
 ## Prerequisites
 
@@ -8,6 +13,7 @@ Monitors Telegram channels for US F1 visa interview slot availability. Uses a lo
 - [Ollama](https://ollama.com) installed and running
 - A Telegram account
 - A Twilio account with WhatsApp sandbox enabled
+- A checkvisaslots.com API key (get one at [checkvisaslots.com](https://checkvisaslots.com))
 
 ---
 
@@ -56,19 +62,29 @@ cp .env.example .env
 Edit `.env` and fill in your values:
 
 ```env
+# Telegram
 TELEGRAM_API_ID=your_api_id
 TELEGRAM_API_HASH=your_api_hash
 TELEGRAM_CHANNELS=@yourchannel
 
+# Twilio WhatsApp
 TWILIO_ACCOUNT_SID=your_account_sid
 TWILIO_AUTH_TOKEN=your_auth_token
 TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
 ALERT_TO=whatsapp:+1XXXXXXXXXX
+
+# checkvisaslots.com
+CVS_API_KEY=your_api_key
+CVS_LOCATIONS=CHENNAI,NEW DELHI    # leave empty to monitor all locations
+CVS_POLL_INTERVAL=300              # seconds between API polls (default: 5 min)
+CVS_DURATION_DAYS=120              # only alert for slots within this many days
 ```
 
-- `TELEGRAM_CHANNELS` — username of the Telegram channel to monitor (e.g. `@F1_Visa_Slots_Group`). Comma-separate multiple channels.
+**Key variables:**
+- `TELEGRAM_CHANNELS` — Telegram channel username (e.g. `@F1_Visa_Slots_Group`). Comma-separate for multiple.
 - `TWILIO_WHATSAPP_FROM` — the Twilio sandbox number (keep the `whatsapp:` prefix)
 - `ALERT_TO` — your WhatsApp number with country code (e.g. `whatsapp:+917994741413`)
+- `CVS_LOCATIONS` — comma-separated list of consulate names to filter (e.g. `CHENNAI,NEW DELHI`). Leave blank to alert for all locations.
 
 ---
 
@@ -84,24 +100,42 @@ On the first run, Telethon will ask for your Telegram phone number and a one-tim
 You'll see logs like:
 
 ```
-2026-05-24 10:00:00 [INFO] Monitoring channel: F1_Visa_Slots_Group (id=...)
-2026-05-24 10:00:01 [INFO] Listening for messages. Press Ctrl+C to stop.
-2026-05-24 10:05:23 [INFO] [F1_Visa_Slots_Group] New message: slots are open for Chennai consulate!
-2026-05-24 10:05:24 [INFO] LLM verdict: YES
-2026-05-24 10:05:24 [INFO] WhatsApp alert sent for channel: F1_Visa_Slots_Group
+2026-05-27 10:00:00 [INFO] Monitoring channel: F1_Visa_Slots_Group (id=...)
+2026-05-27 10:00:00 [INFO] checkvisaslots.com poller started — interval 300s, locations: CHENNAI, NEW DELHI
+2026-05-27 10:00:01 [INFO] Listening for messages. Press Ctrl+C to stop.
+2026-05-27 10:00:01 [INFO] checkvisaslots.com — API calls remaining: 42
+2026-05-27 10:00:01 [INFO] checkvisaslots.com — no open slots found
+2026-05-27 10:05:23 [INFO] [F1_Visa_Slots_Group] New message: slots are open for Chennai!
+2026-05-27 10:05:24 [INFO] LLM verdict: YES
+2026-05-27 10:05:24 [INFO] WhatsApp alert sent — source: telegram
 ```
+
+---
 
 ## How alerting works
 
-Each incoming message is passed to `gemma3:1b` running locally via Ollama. The model is prompted to reply `YES` only if the message is a **present-tense, assertive confirmation** that slots are open and bookable right now. It replies `NO` for:
+### checkvisaslots.com (primary)
 
-- Speculation or predictions about future slots
-- Questions asking if slots are open
-- Past experiences or historical discussion
-- Rumours or unverified claims
-- General tips, advice, or complaints
+Polls the checkvisaslots.com API every 5 minutes. When slots with a count > 0 are found for your configured locations and within your duration window, you get a WhatsApp message:
 
-This keeps false positives low — you only get alerted when someone is clearly saying slots are open now.
+```
+🟢 Visa Slot Confirmed — checkvisaslots.com
+
+Slots available on checkvisaslots.com:
+• CHENNAI: 3 slot(s) from 15 Jun 2026
+
+Book now: https://checkvisaslots.com
+```
+
+### Telegram (secondary)
+
+Each incoming message is evaluated by `gemma3:1b` running locally via Ollama, using the last 5 messages as context. The model replies `YES` only for a **present-tense, assertive confirmation** that slots are open now — not speculation, questions, or general discussion. When triggered:
+
+```
+💬 Possible Slot Alert — Telegram
+
+slots just dropped for Chennai, book now!!
+```
 
 ---
 

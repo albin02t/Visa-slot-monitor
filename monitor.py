@@ -9,6 +9,7 @@ from datetime import datetime
 from dotenv import load_dotenv
 from telethon import TelegramClient, events
 from twilio.rest import Client as TwilioClient
+from slot_checker import poll_checkvisaslots
 
 load_dotenv()
 
@@ -82,16 +83,23 @@ def is_slot_alert(channel: str, new_text: str) -> bool:
         return False
 
 
-def send_whatsapp_alert(channel: str, message_text: str) -> None:
-    preview = message_text[:300].replace("\n", " ")
-    body = (
-        f"🚨 *F1 Visa Slot Alert*\n\n"
-        f"Channel: {channel}\n"
-        f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-        f"Message:\n{preview}"
-    )
+def send_whatsapp_alert(message_text: str, source: str = "telegram") -> None:
+    now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if source == "api":
+        body = (
+            f"🟢 *Visa Slot Confirmed — checkvisaslots.com*\n\n"
+            f"Time: {now}\n\n"
+            f"{message_text[:600]}\n\n"
+            f"Book now: https://checkvisaslots.com"
+        )
+    else:
+        body = (
+            f"💬 *Possible Slot Alert — Telegram*\n\n"
+            f"Time: {now}\n\n"
+            f"{message_text[:600]}"
+        )
     twilio.messages.create(from_=TWILIO_FROM, to=ALERT_TO, body=body)
-    log.info("WhatsApp alert sent for channel: %s", channel)
+    log.info("WhatsApp alert sent — source: %s", source)
 
 
 async def main() -> None:
@@ -125,12 +133,21 @@ async def main() -> None:
         if is_slot_alert(channel_name, text):
             log.info("SLOT ALERT detected in %s — sending WhatsApp notification", channel_name)
             try:
-                send_whatsapp_alert(channel_name, text)
+                send_whatsapp_alert(text, source="telegram")
             except Exception as e:
                 log.error("Failed to send WhatsApp alert: %s", e)
 
+    async def on_api_slots_found(summary: str) -> None:
+        try:
+            send_whatsapp_alert(summary, source="api")
+        except Exception as e:
+            log.error("Failed to send API slot WhatsApp alert: %s", e)
+
     log.info("Listening for messages. Press Ctrl+C to stop.")
-    await client.run_until_disconnected()
+    await asyncio.gather(
+        client.run_until_disconnected(),
+        poll_checkvisaslots(on_api_slots_found),
+    )
 
 
 if __name__ == "__main__":
