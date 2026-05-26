@@ -1,7 +1,8 @@
 import os
-import re
 import asyncio
 import logging
+import urllib.request
+import json
 from datetime import datetime
 
 from dotenv import load_dotenv
@@ -26,41 +27,55 @@ TWILIO_TOKEN = os.environ["TWILIO_AUTH_TOKEN"]
 TWILIO_FROM = os.environ["TWILIO_WHATSAPP_FROM"]
 ALERT_TO = os.environ["ALERT_TO"]
 
-# Keywords that strongly suggest slots have opened
-POSITIVE_PATTERNS = [
-    r"\bslots?\s+(are\s+)?(?:open|available|released|showing|live)\b",
-    r"\bappointment\s+(?:slots?\s+)?(?:are\s+)?(?:open|available|released|showing|live)\b",
-    r"\bdates?\s+(?:are\s+)?(?:available|open|showing)\b",
-    r"\bvisa\s+(?:interview\s+)?(?:slots?\s+)?(?:are\s+)?(?:open|available|released)\b",
-    r"\bbook(?:ing)?\s+(?:now|open|available)\b",
-    r"\bslots?\s+(?:just\s+)?(?:dropped|opened|appeared)\b",
-    r"\bnew\s+(?:slots?|dates?|appointments?)\s+(?:available|open|added)\b",
-    r"\bF-?1\s+(?:slots?|dates?|appointments?)\s+(?:available|open)\b",
-    r"\bconsulate\s+(?:slots?|dates?|appointments?)\s+(?:available|open)\b",
-    r"\bhurry\b.{0,60}(?:slot|appointment|date)",
-    r"(?:slot|appointment|date).{0,60}\bhurry\b",
-]
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma3:1b")
+OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/chat")
 
-# Keywords that indicate the opposite (to reduce false positives)
-NEGATIVE_PATTERNS = [
-    r"\bno\s+slots?\b",
-    r"\bslots?\s+(?:not|aren['’]t)\s+(?:available|open)\b",
-    r"\b(?:fully\s+)?booked\b",
-    r"\bunavailable\b",
-]
-
-_positive_re = [re.compile(p, re.IGNORECASE) for p in POSITIVE_PATTERNS]
-_negative_re = [re.compile(p, re.IGNORECASE) for p in NEGATIVE_PATTERNS]
+SYSTEM_PROMPT = (
+    "You monitor Telegram messages for US F1 student visa interview slot availability. "
+    "Reply YES only if the message is assertively and clearly announcing that visa interview slots are open RIGHT NOW and can be booked immediately. "
+    "The message must be a present-tense, confident declaration — someone saying slots are available now, just opened, or actively showing on the booking system. "
+    "Reply NO for everything else, including: "
+    "speculation or predictions about when slots might open, "
+    "past experiences or historical discussion, "
+    "questions asking if slots are open, "
+    "rumours or unverified claims, "
+    "complaints about no slots, "
+    "general tips or advice, "
+    "news about slots expected in the future, "
+    "or any message that is not a direct present-tense confirmation that slots are available to book right now. "
+    "When in doubt, reply NO. Reply with exactly one word: YES or NO."
+)
 
 twilio = TwilioClient(TWILIO_SID, TWILIO_TOKEN)
 
 
 def is_slot_alert(text: str) -> bool:
-    if not text:
+    if not text or len(text.strip()) < 5:
         return False
-    if any(r.search(text) for r in _negative_re):
+
+    payload = json.dumps({
+        "model": OLLAMA_MODEL,
+        "messages": [
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": text[:1000]},
+        ],
+        "stream": False,
+    }).encode()
+
+    try:
+        req = urllib.request.Request(
+            OLLAMA_URL,
+            data=payload,
+            headers={"Content-Type": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            result = json.loads(resp.read())
+        answer = result["message"]["content"].strip().upper()
+        log.info("LLM verdict: %s", answer)
+        return answer.startswith("YES")
+    except Exception as e:
+        log.error("Ollama call failed: %s — skipping message", e)
         return False
-    return any(r.search(text) for r in _positive_re)
 
 
 def send_whatsapp_alert(channel: str, message_text: str) -> None:

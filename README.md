@@ -1,10 +1,11 @@
 # Visa Slot Monitor
 
-Monitors Telegram channels for US F1 visa interview slot availability. Uses keyword and regex pattern matching to detect slot-related messages and sends a WhatsApp alert via Twilio when slots open up.
+Monitors Telegram channels for US F1 visa interview slot availability. Uses a local LLM (via Ollama) to read incoming messages and sends a WhatsApp alert via Twilio when slots are assertively confirmed as open right now.
 
 ## Prerequisites
 
 - Python 3.10+
+- [Ollama](https://ollama.com) installed and running
 - A Telegram account
 - A Twilio account with WhatsApp sandbox enabled
 
@@ -27,7 +28,13 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-### 3. Get your Telegram API credentials
+### 3. Pull the LLM model
+
+```bash
+ollama pull gemma3:1b
+```
+
+### 4. Get your Telegram API credentials
 
 1. Go to [my.telegram.org/apps](https://my.telegram.org/apps) and log in
 2. Create a new application (URL can be left blank or set to `https://localhost`)
@@ -84,10 +91,22 @@ You'll see logs like:
 2026-05-24 10:05:24 [INFO] WhatsApp alert sent for channel: F1_Visa_Slots_Group
 ```
 
+## How alerting works
+
+Each incoming message is passed to `gemma3:1b` running locally via Ollama. The model is prompted to reply `YES` only if the message is a **present-tense, assertive confirmation** that slots are open and bookable right now. It replies `NO` for:
+
+- Speculation or predictions about future slots
+- Questions asking if slots are open
+- Past experiences or historical discussion
+- Rumours or unverified claims
+- General tips, advice, or complaints
+
+This keeps false positives low — you only get alerted when someone is clearly saying slots are open now.
+
 ---
 
 ## Notes
 
 - Keep the script running at all times to catch alerts in real-time
-- The session file (`visa_monitor_session.session`) stores your Telegram login — do not share it
+- The session file (`visa_monitor_session.session`) stores your Telegram login — do not share or commit it
 - Do not commit your `.env` file
