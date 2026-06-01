@@ -1,12 +1,32 @@
 import os
+import json
 import asyncio
 import logging
 from datetime import datetime, timedelta
+from pathlib import Path
 
 import httpx
 from dateutil import parser as dateparser
 
 log = logging.getLogger(__name__)
+
+ALERTED_SLOTS_FILE = Path(__file__).parent / ".alerted_slots.json"
+
+
+def _load_alerted_slots() -> set[str]:
+    if ALERTED_SLOTS_FILE.exists():
+        try:
+            return set(json.loads(ALERTED_SLOTS_FILE.read_text()))
+        except Exception:
+            pass
+    return set()
+
+
+def _save_alerted_slots(alerted: set[str]) -> None:
+    try:
+        ALERTED_SLOTS_FILE.write_text(json.dumps(list(alerted)))
+    except Exception as e:
+        log.warning("Could not save alerted slots: %s", e)
 
 CVS_API_URL = "https://app.checkvisaslots.com/slots/v3"
 
@@ -15,7 +35,7 @@ def _get_config():
     api_key = os.environ.get("CVS_API_KEY")
     if not api_key:
         raise ValueError("CVS_API_KEY is not set in environment")
-    poll_interval = int(os.environ.get("CVS_POLL_INTERVAL", "300"))
+    poll_interval = int(os.environ.get("CVS_POLL_INTERVAL", "900"))  # default to 15 minutes
     locations = [
         loc.strip().upper()
         for loc in os.environ.get("CVS_LOCATIONS", "").split(",")
@@ -25,7 +45,7 @@ def _get_config():
     headers = {
         "accept": "*/*",
         "accept-language": "en-US,en;q=0.9",
-        "extversion": "4.6.5.1",
+        "extversion": "4.7.0.2",
         "origin": "chrome-extension://beepaenfejnphdgnkmccjcfiieihhogl",
         "user-agent": (
             "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -55,7 +75,8 @@ async def poll_checkvisaslots(on_slots_found) -> None:
         poll_interval,
         locations or "all",
     )
-    alerted_slots: set[str] = set()
+    alerted_slots: set[str] = _load_alerted_slots()
+    log.info("Loaded %d previously alerted slots from disk", len(alerted_slots))
 
     async with httpx.AsyncClient(timeout=30) as client:
         while True:
@@ -95,11 +116,13 @@ async def poll_checkvisaslots(on_slots_found) -> None:
                         await on_slots_found(summary)
                         for s in new_slots:
                             alerted_slots.add(f"{s['visa_location']}|{s.get('start_date', '')}")
+                        _save_alerted_slots(alerted_slots)
                     else:
                         log.info("checkvisaslots.com — slots still open but already alerted")
                 else:
                     log.info("checkvisaslots.com — no open slots found")
-                    alerted_slots.clear()  # reset so we re-alert when slots reopen
+                    alerted_slots.clear()
+                    _save_alerted_slots(alerted_slots)  # reset on disk too
 
             except Exception as e:
                 log.error("checkvisaslots.com poll failed: %s", e)
