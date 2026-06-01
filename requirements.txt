@@ -1,3 +1,5 @@
 telethon
 twilio
 python-dotenv
+httpx
+python-dateutil

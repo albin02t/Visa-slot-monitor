@@ -83,7 +83,7 @@ def is_slot_alert(channel: str, new_text: str) -> bool:
         return False
 
 
-def send_whatsapp_alert(message_text: str, source: str = "telegram") -> None:
+def send_whatsapp_alert(message_text: str, source: str = "telegram", context_window: list[str] | None = None) -> None:
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     if source == "api":
         body = (
@@ -93,10 +93,14 @@ def send_whatsapp_alert(message_text: str, source: str = "telegram") -> None:
             f"Book now: https://checkvisaslots.com"
         )
     else:
+        if context_window:
+            msgs = "\n\n".join(f"[{i+1}] {msg[:300]}" for i, msg in enumerate(context_window))
+        else:
+            msgs = message_text[:600]
         body = (
             f"💬 *Possible Slot Alert — Telegram*\n\n"
             f"Time: {now}\n\n"
-            f"{message_text[:600]}"
+            f"{msgs}"
         )
     twilio.messages.create(from_=TWILIO_FROM, to=ALERT_TO, body=body)
     log.info("WhatsApp alert sent — source: %s", source)
@@ -133,7 +137,8 @@ async def main() -> None:
         if is_slot_alert(channel_name, text):
             log.info("SLOT ALERT detected in %s — sending WhatsApp notification", channel_name)
             try:
-                send_whatsapp_alert(text, source="telegram")
+                window = list(recent_messages[channel_name])
+                send_whatsapp_alert(text, source="telegram", context_window=window)
             except Exception as e:
                 log.error("Failed to send WhatsApp alert: %s", e)
 
