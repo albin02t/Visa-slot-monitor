@@ -79,6 +79,32 @@ client.on('message', async msg => {
     }
 });
 
+function scheduleDailyKeepalive() {
+    const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+    const nowUtc = Date.now();
+    const nowIst = new Date(nowUtc + IST_OFFSET_MS);
+
+    const nextTarget = new Date(nowIst);
+    nextTarget.setHours(8, 0, 0, 0);
+    if (nowIst >= nextTarget) nextTarget.setDate(nextTarget.getDate() + 1);
+
+    const delayMs = nextTarget - nowIst;
+    console.log(`Keepalive: next 'join lovely-rest' in ${Math.round(delayMs / 1000)}s (at 08:00 IST)`);
+
+    setTimeout(async () => {
+        const twilioChat = `${TWILIO_NUMBER.replace('+', '')}@c.us`;
+        try {
+            await client.sendMessage(twilioChat, 'join lovely-rest');
+            console.log(`[${new Date().toISOString()}] Keepalive: sent 'join lovely-rest' to Twilio sandbox`);
+        } catch (err) {
+            console.error('Keepalive send failed:', err.message);
+        }
+        scheduleDailyKeepalive();
+    }, delayMs);
+}
+
+client.on('ready', () => scheduleDailyKeepalive());
+
 client.on('auth_failure', () => console.error('WhatsApp auth failed — delete .wwebjs_auth and try again'));
 client.on('disconnected', reason => console.warn('Disconnected:', reason));
 
