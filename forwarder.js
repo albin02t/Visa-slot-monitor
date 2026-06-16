@@ -95,6 +95,7 @@ function scheduleDailyKeepalive() {
         const twilioChat = `${TWILIO_NUMBER.replace('+', '')}@c.us`;
         try {
             await client.sendMessage(twilioChat, 'join lovely-rest');
+            await new Promise(r => setTimeout(r, 5000));
             console.log(`[${new Date().toISOString()}] Keepalive: sent 'join lovely-rest' to Twilio sandbox`);
         } catch (err) {
             console.error('Keepalive send failed:', err.message);
