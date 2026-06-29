@@ -1,1 +1,39 @@
+# Secrets & credentials — NEVER commit
+.env
+*.env
+!.env.example
+client_secret_*.json
+*credentials*.json
+
+# Python
+__pycache__/
+*.py[cod]
+venv/
+.venv/
+
+# Node
+node_modules/
+
+# Databases (Postgres is the source of truth; these are local/dev artifacts)
+*.db
+events.db
+
+# Telegram session files
+*.session
+*.session-journal
+visa_monitor_session*
+
+# WhatsApp Web (whatsapp-web.js) session + cache
+.wwebjs_auth/
+.wwebjs_cache/
+
+# checkvisaslots dedupe state
 .alerted_slots.json
+
+# Per-user runtime data (Docker volume)
+data/
+users/
+
+# OS / editor
+.DS_Store
+*.swp
