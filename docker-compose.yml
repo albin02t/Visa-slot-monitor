@@ -1,0 +1,76 @@
+services:
+  app:
+    build: .
+    init: true                  # reap zombie Chromium processes from the forwarder
+    ports:
+      - "${PORT:-8000}:8000"
+    volumes:
+      - app_data:/data            # per-user sessions, wwebjs auth, env files
+    environment:
+      - DATA_DIR=/data
+      # DB connection built from parts in web/db.py (password is URL-encoded,
+      # so special characters like @ : / are safe).
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_USER=visa
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-visa}
+      - POSTGRES_DB=visa
+      # --- Auth (Google OAuth) ---
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID:-}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET:-}
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      - PUBLIC_BASE_URL=${PUBLIC_BASE_URL:-http://localhost:8000}
+      - COOKIE_SECURE=${COOKIE_SECURE:-0}
+      - ALLOW_DEV_LOGIN=${ALLOW_DEV_LOGIN:-0}
+      # --- Transactional email (SMTP) ---
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SMTP_FROM=${SMTP_FROM:-}
+      # --- Runtime (Ollama is managed by us, not user-configurable) ---
+      - OLLAMA_URL=http://ollama:11434/api/chat
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:4b}
+      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_started
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_USER=visa
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-visa}
+      - POSTGRES_DB=visa
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U visa -d visa"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  ollama:
+    image: ollama/ollama
+    expose:
+      - "11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    restart: unless-stopped
+    # Uncomment for GPU acceleration:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+
+volumes:
+  app_data:
+  pg_data:
+  ollama_data:

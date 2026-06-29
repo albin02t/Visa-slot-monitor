@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Visa Slot Monitor</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>tailwind.config = { darkMode: 'class' }</script>
+  <style>
+    *{box-sizing:border-box}
+    body{background:#070d18;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif}
+    ::-webkit-scrollbar{width:4px;height:4px}
+    ::-webkit-scrollbar-thumb{background:#2a3a52;border-radius:4px}
+    ::-webkit-scrollbar-track{background:transparent}
+
+    .glow{background:radial-gradient(60% 60% at 50% 0%,#1e3a8a30 0%,transparent 70%)}
+    #sidebar{width:224px;min-width:224px;background:#0b1322;border-right:1px solid #18233a}
+
+    .nav-item{display:flex;align-items:center;gap:11px;padding:9px 13px;border-radius:9px;cursor:pointer;
+              font-size:13.5px;color:#5b6b85;transition:all .15s;margin:1px 9px}
+    .nav-item:hover{color:#9fb0cb;background:#16213705}
+    .nav-item:hover{background:#141f33}
+    .nav-item.active{color:#fff;background:linear-gradient(90deg,#1e3a8a40,#1e3a8a10);box-shadow:inset 2px 0 0 #3b82f6}
+    .nav-item.active .nv{color:#60a5fa}
+
+    .card{background:#0c1626;border:1px solid #18233a;border-radius:14px}
+    .card-sm{background:#0a1322;border:1px solid #16213a;border-radius:11px}
+
+    .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+    .dot-on{background:#22c55e;box-shadow:0 0 9px #22c55e90}
+    .dot-off{background:#2a3a52}
+
+    .inp{width:100%;background:#070f1d;border:1px solid #1d2c47;border-radius:9px;padding:9px 12px;
+         color:#e6edf7;font-size:13px;outline:none;transition:border-color .15s}
+    .inp:focus{border-color:#3b82f6}
+    .inp::placeholder{color:#2c3c58}
+    .lbl{display:block;font-size:12px;font-weight:500;color:#6b7b96;margin-bottom:6px}
+
+    .btn{border:none;border-radius:9px;font-weight:600;cursor:pointer;transition:all .15s}
+    .btn-primary{background:#2563eb;color:#fff;padding:9px 18px;font-size:13px}
+    .btn-primary:hover{background:#3b82f6}
+    .btn-primary:disabled{opacity:.5;cursor:default}
+    .btn-success{background:#15803d;color:#fff;padding:9px 18px;font-size:13px}
+    .btn-success:hover{background:#16a34a}
+    .btn-ghost{background:transparent;color:#6b7b96;border:1px solid #1d2c47;padding:7px 14px;font-size:12px;border-radius:9px;cursor:pointer}
+    .btn-ghost:hover{color:#9fb0cb;border-color:#2c3c58}
+
+    .badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
+    .badge-green{background:#14532d50;color:#86efac;border:1px solid #15803d}
+    .badge-blue{background:#1e3a8a50;color:#93c5fd;border:1px solid #1e40af}
+    .badge-gray{background:#1a2742;color:#5b6b85;border:1px solid #243352}
+    .badge-yellow{background:#78350f50;color:#fcd34d;border:1px solid #92400e}
+
+    .step-btn{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;cursor:pointer;
+              font-size:12.5px;color:#445268;transition:all .15s;width:100%;text-align:left}
+    .step-btn:hover{color:#9fb0cb}
+    .step-btn.active{color:#93c5fd;background:#1e3a8a25}
+    .step-num{width:21px;height:21px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+              font-size:10px;font-weight:700;border:1px solid #243352;color:#445268;flex-shrink:0}
+    .step-btn.active .step-num{border-color:#3b82f6;color:#60a5fa;background:#1e3a8a30}
+    .step-btn.done .step-num{background:#15803d;border-color:#15803d;color:#fff}
+
+    #log-box{font-family:'JetBrains Mono','Fira Code',monospace;font-size:11.5px;line-height:1.7}
+    .l-err{color:#f87171}.l-warn{color:#fbbf24}.l-dbg{color:#2c3c58}.l-info{color:#52617a}
+
+    .fade-in{animation:fi .2s ease}@keyframes fi{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+    #toast{transition:opacity .2s,transform .2s}#toast.hide{opacity:0;transform:translateY(8px);pointer-events:none}
+    .feed{max-height:340px;overflow-y:auto}
+    .feed-item{padding:12px 16px;border-bottom:1px solid #16213a60}
+    .feed-item:last-child{border-bottom:none}
+    .gbtn{display:inline-flex;align-items:center;gap:10px;background:#fff;color:#1f2937;font-weight:600;
+          font-size:14px;padding:11px 22px;border-radius:11px;cursor:pointer;transition:transform .12s,box-shadow .12s;border:none}
+    .gbtn:hover{transform:translateY(-1px);box-shadow:0 8px 24px #0006}
+  </style>
+</head>
+<body class="text-slate-300">
+
+<!-- ═══════════════════  LANDING / LOGIN  ═══════════════════ -->
+<div id="landing" class="hidden fixed inset-0 z-50 overflow-y-auto glow" style="background:#070d18">
+  <div class="min-h-full flex flex-col">
+    <!-- top bar -->
+    <div class="flex items-center justify-between px-6 py-5 max-w-6xl mx-auto w-full">
+      <div class="flex items-center gap-2.5">
+        <span class="text-2xl">🛂</span>
+        <span class="font-bold text-white">Visa Slot Monitor</span>
+      </div>
+    </div>
+
+    <!-- hero -->
+    <div class="flex-1 flex items-center justify-center px-6 py-10">
+      <div class="max-w-2xl text-center">
+        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-950/50 border border-blue-900/60 text-blue-300 text-xs font-medium mb-7">
+          <span class="dot dot-on"></span> Real-time F1 visa slot detection
+        </div>
+        <h1 class="text-4xl sm:text-5xl font-extrabold text-white leading-tight tracking-tight">
+          Never miss a<br><span class="text-transparent bg-clip-text" style="background-image:linear-gradient(90deg,#60a5fa,#a78bfa)">visa interview slot</span> again
+        </h1>
+        <p class="text-slate-400 mt-5 text-base sm:text-lg max-w-xl mx-auto">
+          Monitors checkvisaslots.com and Telegram channels around the clock, and sends a WhatsApp alert the instant slots open.
+        </p>
+
+        <div class="mt-9 flex flex-col items-center gap-3">
+          <button id="google-btn" onclick="location.href='/api/auth/login'" class="gbtn">
+            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+            Continue with Google
+          </button>
+          <button id="dev-btn" onclick="devLogin()" class="hidden btn-ghost">Dev login (local)</button>
+          <p id="no-auth-msg" class="hidden text-amber-400 text-xs mt-2 max-w-sm">
+            Google OAuth isn't configured. Set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET, or enable ALLOW_DEV_LOGIN=1 for local testing.
+          </p>
+          <p id="login-err" class="hidden text-red-400 text-xs mt-2"></p>
+        </div>
+
+        <!-- feature row -->
+        <div class="grid sm:grid-cols-3 gap-3 mt-14 text-left">
+          <div class="card-sm p-4"><p class="text-green-400 text-sm font-semibold mb-1">🌐 API polling</p><p class="text-xs text-slate-500">Confirmed open slots from checkvisaslots.com on your schedule.</p></div>
+          <div class="card-sm p-4"><p class="text-blue-400 text-sm font-semibold mb-1">💬 AI Telegram filter</p><p class="text-xs text-slate-500">A local LLM separates real announcements from noise.</p></div>
+          <div class="card-sm p-4"><p class="text-yellow-400 text-sm font-semibold mb-1">📱 WhatsApp alerts</p><p class="text-xs text-slate-500">Instant alerts to you and anyone you choose to forward to.</p></div>
+        </div>
+      </div>
+    </div>
+    <p class="text-center text-slate-700 text-xs pb-6">Visa Slot Monitor</p>
+  </div>
+</div>
+
+<!-- ═══════════════════  APP  ═══════════════════ -->
+<div id="app" class="hidden flex h-screen overflow-hidden">
+
+  <!-- SIDEBAR -->
+  <aside id="sidebar" class="flex flex-col h-full overflow-hidden">
+    <div class="px-4 py-5 border-b border-slate-800/50">
+      <div class="flex items-center gap-2.5">
+        <span class="text-xl">🛂</span>
+        <div><p class="text-sm font-bold text-white leading-tight">Visa Slot</p>
+             <p class="text-xs text-slate-600 leading-tight">Monitor</p></div>
+      </div>
+    </div>
+
+    <!-- service status (read-only — processes are managed automatically) -->
+    <div class="px-3 py-3 border-b border-slate-800/50 space-y-2">
+      <p class="text-[10px] text-slate-600 uppercase tracking-widest font-bold px-2">Status</p>
+      <div class="flex items-center gap-2 px-2"><span id="sdot-monitor" class="dot dot-off"></span><span class="text-xs text-slate-500">Monitor</span><span id="mon-txt" class="text-[10px] text-slate-700 ml-auto">idle</span></div>
+      <div class="flex items-center gap-2 px-2"><span id="sdot-forwarder" class="dot dot-off"></span><span class="text-xs text-slate-500">Forwarder</span><span id="fwd-txt" class="text-[10px] text-slate-700 ml-auto">idle</span></div>
+      <div class="flex items-center gap-2 px-2"><span id="sdot-ollama" class="dot dot-off"></span><span class="text-xs text-slate-500">AI engine</span><span id="ollama-txt" class="text-[10px] text-slate-700 ml-auto">—</span></div>
+    </div>
+
+    <!-- nav -->
+    <nav class="flex-1 py-3 overflow-y-auto">
+      <button class="nav-item active" data-page="dashboard" onclick="gotoPage('dashboard')"><span class="nv text-base">⬛</span> Dashboard</button>
+      <button class="nav-item" data-page="setup" onclick="gotoPage('setup')"><span class="nv text-base">⚙️</span> Setup</button>
+      <button class="nav-item" data-page="logs" onclick="gotoPage('logs')"><span class="nv text-base">📋</span> Live Logs</button>
+    </nav>
+
+    <!-- user -->
+    <div class="px-3 py-3 border-t border-slate-800/50">
+      <div class="flex items-center gap-2.5 px-1">
+        <img id="user-avatar" class="w-7 h-7 rounded-full bg-slate-700" alt="">
+        <div class="min-w-0 flex-1">
+          <p id="user-name" class="text-xs font-medium text-slate-300 truncate">—</p>
+          <p id="user-email" class="text-[10px] text-slate-600 truncate">—</p>
+        </div>
+        <button onclick="logout()" title="Sign out" class="text-slate-600 hover:text-slate-300 text-xs">⏻</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="flex-1 overflow-y-auto">
+
+    <!-- DASHBOARD -->
+    <div id="page-dashboard" class="p-6 space-y-5">
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="card-sm p-4"><p class="text-2xl font-bold text-green-400" id="s-alerts">—</p><p class="text-xs text-slate-600 mt-0.5">Alerts sent</p></div>
+        <div class="card-sm p-4"><p class="text-2xl font-bold text-blue-400" id="s-cvs">—</p><p class="text-xs text-slate-600 mt-0.5">CVS polls</p></div>
+        <div class="card-sm p-4"><p class="text-2xl font-bold text-purple-400" id="s-tg">—</p><p class="text-xs text-slate-600 mt-0.5">TG messages</p></div>
+        <div class="card-sm p-4"><p class="text-2xl font-bold text-yellow-400" id="s-remaining">—</p><p class="text-xs text-slate-600 mt-0.5">CVS API calls left</p></div>
+      </div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div class="card flex flex-col"><div class="px-4 py-3 border-b border-slate-800/50 flex items-center gap-2"><span>🔔</span><h2 class="text-sm font-semibold text-white">Alerts</h2></div><div id="feed-alerts" class="feed flex-1"><div class="feed-item text-center py-10 text-slate-700 text-xs">No alerts yet</div></div></div>
+        <div class="card flex flex-col"><div class="px-4 py-3 border-b border-slate-800/50 flex items-center gap-2"><span>🌐</span><h2 class="text-sm font-semibold text-white">checkvisaslots.com</h2></div><div id="feed-cvs" class="feed flex-1"><div class="feed-item text-center py-10 text-slate-700 text-xs">No checks yet</div></div></div>
+        <div class="card flex flex-col"><div class="px-4 py-3 border-b border-slate-800/50 flex items-center gap-2"><span>💬</span><h2 class="text-sm font-semibold text-white">Telegram</h2></div><div id="feed-tg" class="feed flex-1"><div class="feed-item text-center py-10 text-slate-700 text-xs">No messages yet</div></div></div>
+      </div>
+    </div>
+
+    <!-- SETUP -->
+    <div id="page-setup" class="hidden p-6">
+      <div class="flex gap-5">
+        <div class="w-44 shrink-0"><div class="card-sm p-3 sticky top-6"><p class="text-[10px] text-slate-600 uppercase tracking-widest font-bold px-1 mb-2">Steps</p><div id="step-nav" class="space-y-0.5"></div></div></div>
+        <div class="flex-1 card p-6 min-h-[480px]" id="step-body"></div>
+      </div>
+    </div>
+
+    <!-- LOGS -->
+    <div id="page-logs" class="hidden p-6">
+      <div class="card overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-800/50 flex flex-wrap items-center gap-3 justify-between">
+          <h2 class="text-sm font-semibold text-white">Live Process Logs</h2>
+          <div class="flex items-center gap-3">
+            <label class="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer"><input type="checkbox" id="chk-scroll" checked class="accent-blue-500"> Auto-scroll</label>
+            <select id="log-filter" onchange="renderLogs()" class="bg-slate-900 border border-slate-700 text-slate-400 text-xs rounded-lg px-2 py-1"><option value="all">All</option><option value="monitor">Monitor</option><option value="forwarder">Forwarder</option></select>
+            <button onclick="logLines=[];renderLogs()" class="btn-ghost text-[11px] px-2 py-1">Clear</button>
+          </div>
+        </div>
+        <div id="log-box" class="overflow-y-auto p-4 space-y-px" style="height:calc(100vh - 200px)"><span class="text-slate-700 text-xs">Connecting to log stream…</span></div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- WhatsApp QR modal -->
+<div id="qr-modal" class="hidden fixed inset-0 z-[60] flex items-center justify-center p-4" style="background:rgba(3,8,16,.88);backdrop-filter:blur(3px)">
+  <div class="card p-6 max-w-sm w-full text-center relative">
+    <button onclick="dismissQr()" class="absolute top-3 right-4 text-slate-600 hover:text-slate-300 text-lg">✕</button>
+    <div class="text-3xl mb-2">📱</div>
+    <h3 class="text-white font-bold text-base mb-1">Link WhatsApp</h3>
+    <p class="text-xs text-slate-500 mb-4 leading-relaxed">On your phone: open <strong class="text-slate-400">WhatsApp → Linked devices → Link a device</strong>, then scan this code to activate the forwarder.</p>
+    <div id="qr-canvas" class="bg-white p-3 rounded-xl inline-block"></div>
+    <p class="text-[11px] text-slate-600 mt-4 flex items-center justify-center gap-2"><span class="dot dot-on"></span> Waiting for scan — closes automatically once linked</p>
+  </div>
+</div>
+
+<div id="toast" class="fixed bottom-5 right-5 hide text-sm px-4 py-2.5 rounded-xl shadow-2xl border z-50"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+async function api(url, opts = {}) {
+  opts.credentials = 'same-origin';
+  opts.headers = { 'Content-Type': 'application/json', ...(opts.headers || {}) };
+  const r = await fetch(url, opts);
+  if (r.status === 401) { showLanding(); throw new Error('Unauthorized'); }
+  if (!r.ok) { let m = await r.text(); try { m = JSON.parse(m).detail || m; } catch {} throw new Error(m); }
+  return r.json();
+}
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+const fmtTs = iso => iso ? new Date(iso.endsWith('Z')||iso.includes('+')?iso:iso+'Z').toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
+function showToast(msg, err=false){const t=$('toast');t.textContent=msg;t.className=`fixed bottom-5 right-5 text-sm px-4 py-2.5 rounded-xl shadow-2xl border z-50 ${err?'bg-red-950 border-red-800 text-red-300':'bg-slate-800 border-slate-700 text-slate-200'}`;t.classList.remove('hide');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.add('hide'),3200);}
+
+// ── Auth ──
+function showLanding(){$('landing').classList.remove('hidden');$('app').classList.add('hidden');}
+function showApp(){$('landing').classList.add('hidden');$('app').classList.remove('hidden');}
+
+async function initAuth(){
+  const params = new URLSearchParams(location.search);
+  if(params.get('error')){ showLanding(); $('login-err').textContent='Sign-in failed: '+params.get('error'); $('login-err').classList.remove('hidden'); history.replaceState({},'', '/'); }
+  let me=null;
+  try { me = await api('/api/auth/me'); } catch {}
+  if(me){ applyUser(me); showApp(); boot(); return; }
+  // not logged in — show landing with right buttons
+  const cfg = await api('/api/auth/config');
+  if(!cfg.google){ $('google-btn').classList.add('hidden'); $('no-auth-msg').classList.remove('hidden'); }
+  if(cfg.dev_login){ $('dev-btn').classList.remove('hidden'); }
+  showLanding();
+}
+
+function applyUser(me){
+  $('user-name').textContent = me.name || 'User';
+  $('user-email').textContent = me.email || '';
+  if(me.picture) $('user-avatar').src = me.picture;
+  else $('user-avatar').src = 'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%2360a5fa"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>`);
+}
+
+async function devLogin(){ try{ await api('/api/auth/dev-login',{method:'POST'}); location.reload(); }catch(e){ showToast(e.message,true); } }
+async function logout(){ try{ await api('/api/auth/logout',{method:'POST'}); }catch{} showLanding(); }
+
+// ── Nav ──
+let activePage='dashboard';
+function gotoPage(name){activePage=name;document.querySelectorAll('[id^=page-]').forEach(el=>el.classList.add('hidden'));$('page-'+name).classList.remove('hidden');document.querySelectorAll('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.page===name));if(name==='logs')renderLogs();}
+
+// ── Dashboard ──
+function setDot(id,on){const el=$(id);if(el)el.className=`dot dot-${on?'on':'off'}`;}
+async function refreshDash(){
+  try{
+    const [st,al,cvs,tg]=await Promise.all([api('/api/status'),api('/api/alerts'),api('/api/cvs-checks'),api('/api/tg-events')]);
+    setDot('sdot-monitor',st.monitor);setDot('sdot-forwarder',st.forwarder);setDot('sdot-ollama',st.ollama);
+    $('mon-txt').textContent=st.monitor?'running':'idle';
+    $('fwd-txt').textContent=st.forwarder?'running':'idle';
+    $('ollama-txt').textContent=st.ollama?'online':'offline';
+    $('s-alerts').textContent=al.length;$('s-cvs').textContent=cvs.length;$('s-tg').textContent=tg.length;
+    $('s-remaining').textContent=cvs.find(c=>c.api_remaining)?.api_remaining??'—';
+    $('feed-alerts').innerHTML=al.length?al.map(a=>`<div class="feed-item fade-in"><div class="flex items-center justify-between mb-1"><span class="badge ${a.source==='api'?'badge-green':'badge-blue'}">${a.source==='api'?'API':'Telegram'}</span><span class="text-[11px] text-slate-600">${fmtTs(a.ts)}</span></div><p class="text-xs text-slate-400">WhatsApp alert dispatched</p></div>`).join(''):'<div class="feed-item text-center py-10 text-slate-700 text-xs">No alerts yet</div>';
+    $('feed-cvs').innerHTML=cvs.length?cvs.map(c=>{const ic={slots_found:'🟢',error:'🔴',already_alerted:'🟡',no_slots:'⚫',checked:'⚫'},lb={slots_found:'Slots found!',error:'Poll error',already_alerted:'Already alerted',no_slots:'No slots',checked:'Checked'};const d=c.status==='slots_found'&&c.detail?`<p class="text-xs text-green-400 mt-1 font-mono whitespace-pre-wrap leading-relaxed">${esc(c.detail.split('\n').slice(1).join('\n'))}</p>`:'';return `<div class="feed-item fade-in"><div class="flex items-center justify-between"><span class="text-xs">${ic[c.status]||'⚫'} <span class="text-slate-300">${lb[c.status]||c.status}</span></span><span class="text-[11px] text-slate-600">${fmtTs(c.ts)}</span></div>${d}</div>`;}).join(''):'<div class="feed-item text-center py-10 text-slate-700 text-xs">No checks yet</div>';
+    $('feed-tg').innerHTML=tg.length?tg.map(e=>{const vb=e.verdict==='YES'?'badge-green':e.verdict==='NO'?'badge-gray':'badge-yellow';return `<div class="feed-item fade-in"><div class="flex items-center justify-between mb-1"><span class="text-xs text-slate-400 font-medium truncate max-w-[120px]">${esc(e.channel||'?')}</span><span class="badge ${vb}">${e.verdict||'pending'}</span></div><p class="text-xs text-slate-500 line-clamp-2">${esc(e.preview||'')}</p><p class="text-[11px] text-slate-700 mt-1">${fmtTs(e.ts)}</p></div>`;}).join(''):'<div class="feed-item text-center py-10 text-slate-700 text-xs">No messages yet</div>';
+  }catch{}
+}
+
+// ── Setup wizard ──
+const STEPS=[{title:'Overview',icon:'🛂'},{title:'Telegram',icon:'✈️'},{title:'Twilio WhatsApp',icon:'📱'},{title:'Forwarder',icon:'🔀'},{title:'checkvisaslots.com',icon:'🌐'},{title:'Save & Launch',icon:'✅'}];
+let curStep=0, draft={};
+const STEP_HTML=[
+`<div class="space-y-4 text-sm text-slate-400"><p class="text-base font-semibold text-white">How it works</p><p>Visa Slot Monitor watches two sources in parallel and sends a WhatsApp alert the moment F1 interview slots appear.</p><div class="grid sm:grid-cols-2 gap-3"><div class="card-sm p-4"><p class="text-green-400 font-semibold text-xs mb-2">🌐 checkvisaslots.com API</p><p class="text-xs">Polls on your interval; fires when confirmed open slots match your locations.</p></div><div class="card-sm p-4"><p class="text-blue-400 font-semibold text-xs mb-2">💬 Telegram channels</p><p class="text-xs">A local Ollama LLM reads each message in context and replies YES only for present-tense confirmations.</p></div></div><div class="card-sm p-4"><p class="text-yellow-400 font-semibold text-xs mb-2">📱 WhatsApp via Twilio + Forwarder</p><p class="text-xs">Alerts go through the Twilio sandbox to your number. The Forwarder relays them to extra contacts and keeps the sandbox alive with a daily 08:00 IST message.</p></div><p class="text-slate-600 text-xs">Configure each step on the left. Your settings are private to your account.</p></div>`,
+`<div class="space-y-5"><p class="text-slate-500 text-xs">Get credentials at <a href="https://my.telegram.org/apps" target="_blank" class="text-blue-400 underline">my.telegram.org/apps</a> → create an application.</p><div class="grid sm:grid-cols-2 gap-4"><div><label class="lbl">API ID *</label><input data-key="TELEGRAM_API_ID" class="inp" placeholder="12345678"></div><div><label class="lbl">API Hash *</label><input data-key="TELEGRAM_API_HASH" class="inp" placeholder="abc123..."></div></div><div><label class="lbl">Channels to monitor *</label><input data-key="TELEGRAM_CHANNELS" class="inp" placeholder="@F1_Visa_Slots,@AnotherChannel"><p class="text-[11px] text-slate-600 mt-1">Comma-separated, include @.</p></div><hr class="border-slate-800"><div><p class="text-sm font-semibold text-white mb-3">Telegram Login</p><div id="tg-status-area"><button onclick="checkTgSession()" class="btn-ghost text-xs px-3 py-2">Check session status</button></div></div></div>`,
+`<div class="space-y-4"><p class="text-slate-500 text-xs">From <a href="https://twilio.com" target="_blank" class="text-blue-400 underline">twilio.com</a> → Console for SID/Token, then Messaging → Try it out → WhatsApp for the sandbox.</p><div class="grid sm:grid-cols-2 gap-4"><div><label class="lbl">Account SID *</label><input data-key="TWILIO_ACCOUNT_SID" class="inp" placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"></div><div><label class="lbl">Auth Token *</label><input type="password" data-key="TWILIO_AUTH_TOKEN" class="inp" placeholder="your auth token"></div></div><div class="grid sm:grid-cols-2 gap-4"><div><label class="lbl">Twilio From (sandbox) *</label><input data-key="TWILIO_WHATSAPP_FROM" class="inp" placeholder="whatsapp:+1XXXXXXXXXX"><p class="text-[11px] text-slate-600 mt-1">The sandbox number Twilio shows you. Keep the whatsapp: prefix.</p></div><div><label class="lbl">Your number (Alert To) *</label><input data-key="ALERT_TO" class="inp" placeholder="whatsapp:+1XXXXXXXXXX"><p class="text-[11px] text-slate-600 mt-1">Where alerts are sent. Keep the whatsapp: prefix.</p></div></div><div><label class="lbl">Sandbox join code</label><input data-key="TWILIO_SANDBOX_KEYWORD" class="inp" placeholder="join your-sandbox-code"><p class="text-[11px] text-slate-600 mt-1">Your sandbox's unique join phrase (e.g. <span class="text-slate-500">join example-words</span>). Twilio shows this on the WhatsApp sandbox page — it's different for every account. Used for the daily keepalive.</p></div><div class="card-sm p-3 text-xs text-slate-500">💡 To activate the sandbox, send your join code (above) from your WhatsApp to the Twilio sandbox number. The Forwarder then re-sends it automatically every day at 08:00 IST so the session never expires.</div></div>`,
+`<div class="space-y-4"><p class="text-slate-500 text-xs">The Forwarder uses WhatsApp Web to relay Twilio alerts to extra numbers. After you save, a <strong class="text-slate-400">QR code pops up automatically</strong> — scan it with WhatsApp → Linked devices.</p><div><label class="lbl">Forward to (extra numbers)</label><input data-key="FORWARD_TO" class="inp" placeholder="14155550100,447700900000"><p class="text-[11px] text-slate-600 mt-1">Comma-separated, country code, no + or spaces</p></div><ul class="card-sm p-4 text-xs text-slate-500 space-y-1.5"><li>• Connects via your personal WhatsApp Web session</li><li>• Watches messages from the Twilio sandbox</li><li>• Forwards each alert to the numbers above</li><li>• Sends the daily keepalive automatically</li></ul></div>`,
+`<div class="space-y-4"><p class="text-slate-500 text-xs">Get an API key at <a href="https://checkvisaslots.com" target="_blank" class="text-blue-400 underline">checkvisaslots.com</a>.</p><div><label class="lbl">CVS API Key *</label><input type="password" data-key="CVS_API_KEY" class="inp" placeholder="••••••••"></div><div><label class="lbl">Locations</label><input data-key="CVS_LOCATIONS" class="inp" placeholder="CHENNAI,NEW DELHI"><p class="text-[11px] text-slate-600 mt-1">Uppercase, comma-separated. Blank = all.</p></div><div class="grid sm:grid-cols-2 gap-4"><div><label class="lbl">Poll interval (s)</label><input type="number" data-key="CVS_POLL_INTERVAL" class="inp" placeholder="780"><p class="text-[11px] text-slate-600 mt-1">Default 780. Min 300.</p></div><div><label class="lbl">Duration window (days)</label><input type="number" data-key="CVS_DURATION_DAYS" class="inp" placeholder="120"></div></div></div>`,
+''];
+function collectInputs(){document.querySelectorAll('#step-body [data-key]').forEach(el=>{if(el.value.trim())draft[el.dataset.key]=el.value.trim();});}
+function reviewHtml(){const sens=new Set(['TWILIO_AUTH_TOKEN','CVS_API_KEY','TELEGRAM_API_HASH']);const e=Object.entries(draft);if(!e.length)return '<p class="text-slate-600 text-sm">Nothing configured yet — go back through the steps.</p>';return `<p class="text-slate-500 text-xs mb-3">Review your configuration. Sensitive values are masked.</p><div class="card-sm divide-y divide-slate-800 mb-4 overflow-hidden">${e.map(([k,v])=>`<div class="flex items-center justify-between gap-4 px-3 py-2"><span class="text-[11px] font-mono text-slate-500 shrink-0">${k}</span><span class="text-[11px] font-mono text-slate-300 truncate">${sens.has(k)?'•'.repeat(Math.min(v.length,16)):esc(v)}</span></div>`).join('')}</div><button id="save-btn" onclick="saveConfig()" class="btn btn-success w-full">💾 Save Configuration</button><p class="text-[11px] text-slate-700 text-center mt-2">Saved to your account · processes start automatically once everything below is ready</p><div id="readiness" class="mt-5"></div>`;}
+
+async function checkReadiness(){
+  const el=$('readiness'); if(!el) return;
+  el.innerHTML='<p class="text-xs text-slate-600">Checking launch readiness…</p>';
+  let tg={authorized:false}, st={};
+  try{tg=await api('/api/telegram/status');}catch{}
+  try{st=await api('/api/status');}catch{}
+  const item=(ok,label,hint)=>`<div class="flex items-start gap-2.5 py-1.5"><span class="${ok?'text-green-400':'text-slate-600'} text-sm leading-5">${ok?'✓':'○'}</span><div class="flex-1"><p class="text-xs ${ok?'text-slate-300':'text-slate-400'}">${label}</p>${!ok&&hint?`<p class="text-[11px] text-amber-400/80 mt-0.5">${hint}</p>`:''}</div></div>`;
+  const cfgOk=isConfigured();
+  el.innerHTML=`<div class="card-sm p-4"><p class="text-xs font-semibold text-white mb-1.5">Launch readiness</p>
+    ${item(cfgOk,'Configuration saved',cfgOk?'':'Fill all required fields, then Save')}
+    ${item(tg.authorized,'Telegram account linked',tg.authorized?'':'Go to the <strong>Telegram</strong> step and complete the phone / OTP login')}
+    ${item(st.forwarder,'WhatsApp forwarder linked',st.forwarder?'':'Scan the QR code when it pops up')}
+    ${item(st.monitor,'Monitor running',st.monitor?'':'Starts automatically once Configuration + Telegram are ready')}
+  </div>`;
+}
+function renderStepNav(){$('step-nav').innerHTML=STEPS.map((s,i)=>`<button class="step-btn ${i===curStep?'active':i<curStep?'done':''}" onclick="goStep(${i})"><span class="step-num">${i<curStep?'✓':i+1}</span>${s.title}</button>`).join('');}
+function renderStep(i){const html=i===STEPS.length-1?reviewHtml():STEP_HTML[i];$('step-body').innerHTML=`<div class="space-y-5"><div><div class="flex items-center gap-2 mb-0.5"><span class="text-xl">${STEPS[i].icon}</span><h2 class="text-base font-bold text-white">${STEPS[i].title}</h2></div><p class="text-[11px] text-slate-600">Step ${i+1} of ${STEPS.length}</p></div><div>${html}</div><div class="flex justify-between pt-1 border-t border-slate-800/50"><button onclick="goStep(${i-1})" class="${i===0?'invisible':''} btn-ghost">← Back</button>${i<STEPS.length-1?`<button onclick="goStep(${i+1})" class="btn btn-primary">Next →</button>`:''}</div></div>`;document.querySelectorAll('#step-body [data-key]').forEach(el=>{if(draft[el.dataset.key]!==undefined)el.value=draft[el.dataset.key];});
+  if(i===1)checkTgSession();             // auto-prompt Telegram login
+  if(i===STEPS.length-1)checkReadiness(); // launch readiness checklist
+}
+function goStep(i){if(i<0||i>=STEPS.length)return;collectInputs();curStep=i;renderStepNav();renderStep(i);}
+async function saveConfig(){collectInputs();const b=$('save-btn');b.disabled=true;b.textContent='Saving…';try{await api('/api/config',{method:'POST',body:JSON.stringify({data:draft})});b.textContent='✅ Saved!';showToast('Configuration saved');refreshDash();checkReadiness();setTimeout(checkReadiness,3000);}catch(e){b.textContent='❌ Failed';b.disabled=false;showToast(e.message,true);}}
+async function initSetup(){try{draft=await api('/api/config');}catch{}renderStepNav();renderStep(0);}
+
+// ── Telegram OTP ──
+async function checkTgSession(){const a=$('tg-status-area');a.innerHTML='<span class="text-xs text-slate-500">Checking…</span>';try{const r=await api('/api/telegram/status');if(r.authorized)a.innerHTML='<div class="badge badge-green text-xs">✓ Session active — logged in</div>';else if(r.reason==='credentials_not_set')a.innerHTML='<span class="text-xs text-yellow-400">Save your Telegram API ID & Hash first (above), then check again.</span>';else showTgPhone(a,r.reason);}catch(e){a.innerHTML=`<span class="text-red-400 text-xs">${esc(e.message)}</span>`;}}
+function showTgPhone(a,reason){a.innerHTML=`<p class="text-xs text-slate-500 mb-2">${reason==='no_session'?'No session — log in below.':'Session invalid — log in again.'}</p><div class="flex gap-2"><input id="tg-phone" class="inp" style="max-width:220px" placeholder="+1XXXXXXXXXX" type="tel" autocomplete="off"><button onclick="tgSendCode()" class="btn btn-primary whitespace-nowrap" id="tg-send-btn">Send OTP</button></div>`;}
+async function tgSendCode(){const p=$('tg-phone')?.value?.trim();if(!p){showToast('Enter phone',true);return;}const b=$('tg-send-btn');b.disabled=true;b.textContent='Sending…';try{await api('/api/telegram/send-code',{method:'POST',body:JSON.stringify({phone:p})});showTgCode($('tg-status-area'),p);}catch(e){showToast(e.message,true);b.disabled=false;b.textContent='Send OTP';}}
+function showTgCode(a,phone){a.innerHTML=`<p class="text-xs text-green-400 mb-2">✓ Code sent to ${esc(phone)}</p><div class="flex gap-2 mb-2"><input id="tg-code" class="inp" style="max-width:160px" placeholder="12345" maxlength="6"><button onclick="tgVerify('${esc(phone)}')" class="btn btn-primary" id="tg-verify-btn">Verify</button></div><button onclick="showTgPhone($('tg-status-area'),'')" class="text-xs text-slate-600 underline">← Wrong number</button>`;}
+async function tgVerify(phone){const c=$('tg-code')?.value?.trim();if(!c)return;const b=$('tg-verify-btn');b.disabled=true;b.textContent='Verifying…';try{const r=await api('/api/telegram/verify-code',{method:'POST',body:JSON.stringify({phone,code:c})});if(r.needs_2fa)show2FA($('tg-status-area'));else{$('tg-status-area').innerHTML='<div class="badge badge-green">✓ Logged in to Telegram!</div>';showToast('Telegram session saved');}}catch(e){showToast(e.message,true);b.disabled=false;b.textContent='Verify';}}
+function show2FA(a){a.innerHTML=`<p class="text-xs text-yellow-400 mb-2">Two-factor enabled on your account.</p><div class="flex gap-2"><input id="tg-2fa" class="inp" style="max-width:200px" placeholder="2FA password" type="password"><button onclick="tg2FA()" class="btn btn-primary" id="tg-2fa-btn">Submit</button></div>`;}
+async function tg2FA(){const p=$('tg-2fa')?.value?.trim();if(!p)return;const b=$('tg-2fa-btn');b.disabled=true;b.textContent='Checking…';try{await api('/api/telegram/2fa',{method:'POST',body:JSON.stringify({password:p})});$('tg-status-area').innerHTML='<div class="badge badge-green">✓ Logged in to Telegram!</div>';showToast('Telegram session saved');}catch(e){showToast(e.message,true);b.disabled=false;b.textContent='Submit';}}
+
+// ── Logs ──
+let logLines=[], es=null;
+function logClass(t){if(/\[ERROR\]/.test(t))return 'l-err';if(/\[WARNING\]/.test(t))return 'l-warn';if(/\[DEBUG\]/.test(t))return 'l-dbg';return 'l-info';}
+function renderLogs(){const f=$('log-filter')?.value??'all';const box=$('log-box');const lines=f==='all'?logLines:logLines.filter(l=>l.source===f);if(!lines.length){box.innerHTML='<span class="text-slate-700 text-xs">No log lines yet…</span>';return;}box.innerHTML=lines.map(l=>{const src=l.source==='monitor'?'<span class="text-blue-500/60 text-[10px] w-14 text-right shrink-0">[monitor]</span>':'<span class="text-orange-500/60 text-[10px] w-14 text-right shrink-0">[fwdr]</span>';return `<div class="flex gap-2">${src}<span class="${logClass(l.text)} break-all">${esc(l.text)}</span></div>`;}).join('');if($('chk-scroll')?.checked)box.scrollTop=box.scrollHeight;}
+function startSSE(){if(es)es.close();es=new EventSource('/api/logs/stream');es.onmessage=e=>{logLines.push(JSON.parse(e.data));if(logLines.length>2000)logLines.shift();if(activePage==='logs')renderLogs();};es.onerror=()=>{es.close();setTimeout(startSSE,3000);};}
+
+// ── WhatsApp QR popup ──
+let qrShownFor=null, qrDismissed=null;
+function renderQr(text){const el=$('qr-canvas');el.innerHTML='';new QRCode(el,{text,width:220,height:220,correctLevel:QRCode.CorrectLevel.L});}
+function dismissQr(){qrDismissed=qrShownFor;$('qr-modal').classList.add('hidden');}
+async function pollQr(){
+  try{
+    const {qr}=await api('/api/forwarder/qr');
+    if(qr){
+      if(qr!==qrShownFor){qrShownFor=qr;renderQr(qr);}
+      if(qr!==qrDismissed)$('qr-modal').classList.remove('hidden');
+    }else{
+      if(qrShownFor){showToast('WhatsApp linked ✓');refreshDash();}
+      qrShownFor=null;qrDismissed=null;$('qr-modal').classList.add('hidden');
+    }
+  }catch{}
+}
+
+// ── Boot ──
+const REQUIRED_KEYS=['TELEGRAM_API_ID','TELEGRAM_API_HASH','TELEGRAM_CHANNELS','TWILIO_ACCOUNT_SID','TWILIO_AUTH_TOKEN','TWILIO_WHATSAPP_FROM','ALERT_TO','CVS_API_KEY'];
+function isConfigured(){return REQUIRED_KEYS.every(k=>draft[k]&&String(draft[k]).trim());}
+async function boot(){
+  await initSetup();
+  try{api('/api/processes/ensure',{method:'POST'});}catch{}
+  if(isConfigured()){gotoPage('dashboard');}else{gotoPage('setup');showToast('Welcome! Complete the setup to get started.');}
+  startSSE();refreshDash();setInterval(refreshDash,6000);
+  pollQr();setInterval(pollQr,3000);
+}
+initAuth();
+</script>
+</body>
+</html>

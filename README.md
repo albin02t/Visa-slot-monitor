@@ -1,114 +1,115 @@
 # Visa Slot Monitor
 
-Monitors US F1 visa interview slot availability through two sources simultaneously:
+A multi-user web app that monitors US F1 visa interview slot availability and sends WhatsApp alerts the moment slots appear. Each user signs in with Google, configures their own Telegram / Twilio / checkvisaslots.com credentials through a guided setup wizard, and runs their own monitor.
 
-1. **checkvisaslots.com API** — polls every 5 minutes for confirmed open slots (primary source)
-2. **Telegram channels** — uses a local LLM to detect slot announcements in real-time (secondary source)
+| Source | Method |
+|---|---|
+| **checkvisaslots.com API** | Polls on a configurable interval for confirmed open slots |
+| **Telegram channels** | Watches channels live; a local LLM (Ollama) filters real announcements from noise |
 
-Sends a WhatsApp alert via Twilio when slots are detected, with different messages depending on the source.
-
-## Prerequisites
-
-- Python 3.10+
-- [Ollama](https://ollama.com) installed and running
-- A Telegram account
-- A Twilio account with WhatsApp sandbox enabled
-- A checkvisaslots.com API key (get one at [checkvisaslots.com](https://checkvisaslots.com))
+Alerts are sent via Twilio's WhatsApp sandbox. An optional **Forwarder** relays each alert to additional numbers and sends a daily keepalive to maintain the Twilio session.
 
 ---
 
-## Setup
+## Architecture
 
-### 1. Clone the repo
-
-```bash
-git clone <repo-url>
-cd Visa-slot-monitor
+```
+                         ┌──────────────────────────────┐
+   Browser ── Google ──▶ │  FastAPI app (web/server.py) │
+   sign-in               │  • Google OAuth + JWT cookie │
+                         │  • per-user config (Postgres)│
+                         │  • spawns per-user processes │
+                         └───────┬───────────────┬──────┘
+                                 │               │
+                    per-user     ▼               ▼   per-user
+                  monitor.py (Telegram+CVS)   forwarder.js (WhatsApp Web)
+                                 │               │
+                                 ▼               ▼
+                            Ollama LLM      Chromium session
 ```
 
-### 2. Create a virtual environment and install dependencies
+- **Postgres** stores users (Google identity) and each user's config + event history.
+- Each user's `monitor.py` and `forwarder.js` run as isolated subprocesses with their own data directory (`/data/users/<id>/`) for Telegram and WhatsApp Web sessions.
 
-```bash
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-```
+> **Scaling note:** every active user needs their own Telegram session and a full Chromium instance for WhatsApp Web. A single host handles a modest number of concurrent users. To scale further, move the per-user processes to dedicated worker containers / a job queue — the data model and APIs are already per-user, so that's the natural next step.
 
-### 3. Pull the LLM model
+---
 
-```bash
-ollama pull gemma3:1b
-```
+## Deploy with Docker (recommended)
 
-### 4. Get your Telegram API credentials
+Everything — app, Postgres, and Ollama — runs from one compose file.
 
-1. Go to [my.telegram.org/apps](https://my.telegram.org/apps) and log in
-2. Create a new application (URL can be left blank or set to `https://localhost`)
-3. Copy the **App api_id** and **App api_hash**
-
-### 5. Set up Twilio WhatsApp
-
-1. Sign up at [twilio.com](https://twilio.com)
-2. Go to **Messaging → Try it out → Send a WhatsApp message**
-3. Follow the instructions to join the sandbox (send the join code from your WhatsApp to the sandbox number)
-4. Copy your **Account SID** and **Auth Token** from the Twilio dashboard
-
-### 6. Configure environment variables
+### 1. Configure
 
 ```bash
 cp .env.example .env
 ```
 
-Edit `.env` and fill in your values:
+Edit `.env` and set at minimum:
 
-```env
-# Telegram
-TELEGRAM_API_ID=your_api_id
-TELEGRAM_API_HASH=your_api_hash
-TELEGRAM_CHANNELS=@yourchannel
+| Variable | Purpose |
+|---|---|
+| `POSTGRES_PASSWORD` | Database password |
+| `JWT_SECRET` | Long random string for signing session cookies |
+| `PUBLIC_BASE_URL` | The URL users reach the app at (e.g. `https://slots.example.com`) |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | Google OAuth credentials |
+| `COOKIE_SECURE` | `1` when served over HTTPS |
+| `SMTP_*` | Optional — for the welcome email |
 
-# Twilio WhatsApp
-TWILIO_ACCOUNT_SID=your_account_sid
-TWILIO_AUTH_TOKEN=your_auth_token
-TWILIO_WHATSAPP_FROM=whatsapp:+14155238886
-ALERT_TO=whatsapp:+1XXXXXXXXXX
+### 2. Set up Google OAuth
 
-# checkvisaslots.com
-CVS_API_KEY=your_api_key
-CVS_LOCATIONS=CHENNAI,NEW DELHI    # leave empty to monitor all locations
-CVS_POLL_INTERVAL=300              # seconds between API polls (default: 5 min)
-CVS_DURATION_DAYS=120              # only alert for slots within this many days
+1. Go to [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+2. Create an **OAuth 2.0 Client ID** (type: Web application)
+3. Add an **Authorized redirect URI**: `<PUBLIC_BASE_URL>/api/auth/callback`
+   (e.g. `http://localhost:8000/api/auth/callback`)
+4. Copy the Client ID and Secret into `.env`
+
+### 3. Launch
+
+```bash
+docker compose up --build -d
 ```
 
-**Key variables:**
-- `TELEGRAM_CHANNELS` — Telegram channel username (e.g. `@F1_Visa_Slots_Group`). Comma-separate for multiple.
-- `TWILIO_WHATSAPP_FROM` — the Twilio sandbox number (keep the `whatsapp:` prefix)
-- `ALERT_TO` — your WhatsApp number with country code (e.g. `whatsapp:+917994741413`)
-- `CVS_LOCATIONS` — comma-separated list of consulate names to filter (e.g. `CHENNAI,NEW DELHI`). Leave blank to alert for all locations.
+### 4. Pull the LLM (one-time)
+
+```bash
+docker compose exec ollama ollama pull gemma3:1b
+```
+
+Open **`PUBLIC_BASE_URL`** in your browser and sign in with Google.
 
 ---
 
-## Run
+## Using the app
+
+1. **Sign in** with Google.
+2. **Setup wizard** — walk through Telegram, Twilio, Forwarder, checkvisaslots.com, and Ollama. Save.
+3. **Telegram login** — in the Telegram setup step, enter your phone, receive an OTP in your Telegram app, and verify (handles 2FA). No terminal needed.
+4. **Start processes** from the sidebar (Monitor / Forwarder).
+5. **Dashboard** shows live alerts, checkvisaslots.com poll history, and Telegram activity. **Live Logs** streams real-time output.
+
+For the Forwarder, scan the WhatsApp Web QR code shown in **Live Logs** on first run.
+
+---
+
+## Local development (without Docker)
+
+You'll need a local Postgres and Ollama running.
 
 ```bash
+python3 -m venv venv
 source venv/bin/activate
-python3 monitor.py
+pip install -r requirements.txt
+npm install
+
+export DATABASE_URL="postgresql+asyncpg://visa:visa@localhost:5432/visa"
+export ALLOW_DEV_LOGIN=1          # enables a "Dev login" button, no Google needed
+export OLLAMA_URL="http://localhost:11434/api/chat"
+
+uvicorn web.server:app --host 0.0.0.0 --port 8000
 ```
 
-On the first run, Telethon will ask for your Telegram phone number and a one-time OTP sent to your Telegram app. After that, a session file is saved and you won't need to log in again.
-
-You'll see logs like:
-
-```
-2026-05-27 10:00:00 [INFO] Monitoring channel: F1_Visa_Slots_Group (id=...)
-2026-05-27 10:00:00 [INFO] checkvisaslots.com poller started — interval 300s, locations: CHENNAI, NEW DELHI
-2026-05-27 10:00:01 [INFO] Listening for messages. Press Ctrl+C to stop.
-2026-05-27 10:00:01 [INFO] checkvisaslots.com — API calls remaining: 42
-2026-05-27 10:00:01 [INFO] checkvisaslots.com — no open slots found
-2026-05-27 10:05:23 [INFO] [F1_Visa_Slots_Group] New message: slots are open for Chennai!
-2026-05-27 10:05:24 [INFO] LLM verdict: YES
-2026-05-27 10:05:24 [INFO] WhatsApp alert sent — source: telegram
-```
+Open http://localhost:8000 and click **Dev login**.
 
 ---
 
@@ -116,7 +117,7 @@ You'll see logs like:
 
 ### checkvisaslots.com (primary)
 
-Polls the checkvisaslots.com API every 5 minutes. When slots with a count > 0 are found for your configured locations and within your duration window, you get a WhatsApp message:
+Polls the API every `CVS_POLL_INTERVAL` seconds. Triggers when slots with count > 0 are found for your locations within the duration window:
 
 ```
 🟢 Visa Slot Confirmed — checkvisaslots.com
@@ -129,18 +130,32 @@ Book now: https://checkvisaslots.com
 
 ### Telegram (secondary)
 
-Each incoming message is evaluated by `gemma3:1b` running locally via Ollama, using the last 5 messages as context. The model replies `YES` only for a **present-tense, assertive confirmation** that slots are open now — not speculation, questions, or general discussion. When triggered:
+Each incoming message is passed to `gemma3:1b` via Ollama along with the last 5 messages as context. The model replies `YES` only for a present-tense, assertive confirmation that slots are available right now — not speculation, questions, or general discussion.
 
-```
-💬 Possible Slot Alert — Telegram
+### WhatsApp Forwarder
 
-slots just dropped for Chennai, book now!!
-```
+`forwarder.js` connects to WhatsApp Web using your personal account, watches for messages from the Twilio sandbox, and forwards each one to the numbers in `FORWARD_TO`. It also sends `join lovely-rest` to the Twilio sandbox every day at 08:00 IST to keep the session active.
+
+---
+
+## File overview
+
+| File | Purpose |
+|---|---|
+| `web/server.py` | FastAPI app: auth, per-user config, process orchestration, event APIs |
+| `web/db.py` | Postgres models (User, Alert, CvsCheck, TgEvent) + async engine |
+| `web/auth.py` | Google OAuth + JWT cookie sessions |
+| `web/mailer.py` | SMTP transactional email |
+| `web/static/index.html` | Single-page UI (landing, dashboard, setup wizard, logs) |
+| `monitor.py` | Per-user process: Telegram listener + CVS poller + WhatsApp alerts |
+| `slot_checker.py` | checkvisaslots.com polling logic |
+| `forwarder.js` | WhatsApp Web relay + daily Twilio keepalive |
+| `Dockerfile` / `docker-compose.yml` | Containerized deployment |
 
 ---
 
 ## Notes
 
-- Keep the script running at all times to catch alerts in real-time
-- The session file (`visa_monitor_session.session`) stores your Telegram login — do not share or commit it
-- Do not commit your `.env` file
+- Per-user secrets live in Postgres; `.env` holds only deployment-level config.
+- The `app_data` Docker volume persists per-user Telegram and WhatsApp Web sessions — back it up.
+- Behind a reverse proxy, forward `Host` / `X-Forwarded-Proto` and set `COOKIE_SECURE=1` and the correct `PUBLIC_BASE_URL`.

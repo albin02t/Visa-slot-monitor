@@ -3,3 +3,10 @@ twilio
 python-dotenv
 httpx
 python-dateutil
+fastapi
+uvicorn[standard]
+sqlalchemy[asyncio]
+asyncpg
+authlib
+pyjwt
+itsdangerous

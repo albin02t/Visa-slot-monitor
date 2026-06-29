@@ -5,13 +5,15 @@ import urllib.request
 import json
 from collections import defaultdict, deque
 from datetime import datetime
+from pathlib import Path
 
 from dotenv import load_dotenv
 from telethon import TelegramClient, events
 from twilio.rest import Client as TwilioClient
 from slot_checker import poll_checkvisaslots
 
-load_dotenv()
+DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
+load_dotenv(DATA_DIR / ".env")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -107,9 +109,16 @@ def send_whatsapp_alert(message_text: str, source: str = "telegram", context_win
 
 
 async def main() -> None:
-    client = TelegramClient("visa_monitor_session", TELEGRAM_API_ID, TELEGRAM_API_HASH)
+    client = TelegramClient(str(DATA_DIR / "visa_monitor_session"), TELEGRAM_API_ID, TELEGRAM_API_HASH)
 
-    await client.start()
+    # Connect WITHOUT prompting — the session must already be authorized via the
+    # web Setup page (Telegram login). start() would prompt on stdin and crash.
+    await client.connect()
+    if not await client.is_user_authorized():
+        log.error("Telegram session is not authorized. Complete the Telegram login "
+                  "in the Setup page first, then start again. Exiting.")
+        await client.disconnect()
+        return
     log.info("Telegram client started")
 
     # Resolve channels once at startup to validate they exist

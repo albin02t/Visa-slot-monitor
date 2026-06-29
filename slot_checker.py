@@ -10,7 +10,7 @@ from dateutil import parser as dateparser
 
 log = logging.getLogger(__name__)
 
-ALERTED_SLOTS_FILE = Path(__file__).parent / ".alerted_slots.json"
+ALERTED_SLOTS_FILE = Path(os.environ.get("DATA_DIR", Path(__file__).parent)) / ".alerted_slots.json"
 
 
 def _load_alerted_slots() -> set[str]:
@@ -35,7 +35,7 @@ def _get_config():
     api_key = os.environ.get("CVS_API_KEY")
     if not api_key:
         raise ValueError("CVS_API_KEY is not set in environment")
-    poll_interval = int(os.environ.get("CVS_POLL_INTERVAL", "900"))  # default to 15 minutes
+    poll_interval = int(os.environ.get("CVS_POLL_INTERVAL", "780"))  # default to 15 minutes
     locations = [
         loc.strip().upper()
         for loc in os.environ.get("CVS_LOCATIONS", "").split(",")
