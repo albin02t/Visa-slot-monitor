@@ -1,0 +1,34 @@
+# Production overlay — adds HTTPS via Caddy and enables secure cookies.
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Requires in .env:
+#   DOMAIN=slots.example.com         (DNS A record pointing to this host)
+#   PUBLIC_BASE_URL=https://slots.example.com
+#   COOKIE_SECURE=1
+#   ALLOWED_EMAILS=you@gmail.com,friend@gmail.com
+services:
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      - DOMAIN=${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
+  app:
+    # No longer publish the app port directly — only Caddy is internet-facing.
+    ports: !reset []
+    environment:
+      - COOKIE_SECURE=1
+
+volumes:
+  caddy_data:
+  caddy_config:

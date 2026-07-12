@@ -209,14 +209,44 @@ async def _ensure_running(uid: int, cfg: dict) -> None:
 # ---------------------------------------------------------------------------
 # App lifecycle
 # ---------------------------------------------------------------------------
+async def _resume_all() -> None:
+    """Restart processes for every already-configured user so the service is
+    self-healing after a reboot/redeploy — not dependent on a user opening the page."""
+    await asyncio.sleep(2)
+    try:
+        async with Session() as s:
+            users = (await s.execute(select(User))).scalars().all()
+        for u in users:
+            try:
+                await _ensure_running(u.id, u.config or {})
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     USER_DATA_ROOT.mkdir(parents=True, exist_ok=True)
     await init_db()
+    asyncio.create_task(_resume_all())
     yield
+    # Graceful shutdown — terminate all user subprocesses.
+    for procs in processes.values():
+        for p in procs.values():
+            if p and p.poll() is None:
+                try:
+                    p.terminate()
+                except Exception:
+                    pass
 
 
 app = FastAPI(title="Visa Slot Monitor", lifespan=lifespan)
+
+
+@app.get("/healthz")
+async def healthz():
+    return {"ok": True}
 app.add_middleware(SessionMiddleware, secret_key=auth.JWT_SECRET, same_site="lax")
 
 
@@ -255,6 +285,8 @@ async def auth_callback(request: Request):
     info = token.get("userinfo") or {}
     if not info.get("sub"):
         return RedirectResponse("/?error=no_userinfo")
+    if not auth.is_email_allowed(info.get("email", "")):
+        return RedirectResponse("/?error=not_allowed")
     user = await auth.upsert_user(
         google_sub=info["sub"], email=info.get("email", ""),
         name=info.get("name"), picture=info.get("picture"))

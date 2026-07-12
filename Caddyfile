@@ -1,0 +1,6 @@
+# Caddy auto-provisions and renews a Let's Encrypt TLS cert for $DOMAIN.
+# Set DOMAIN in your .env (e.g. slots.toulelabs.com) with DNS pointing here.
+{$DOMAIN} {
+	encode gzip
+	reverse_proxy app:8000
+}

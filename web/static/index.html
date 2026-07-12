@@ -244,7 +244,7 @@ function showApp(){$('landing').classList.add('hidden');$('app').classList.remov
 
 async function initAuth(){
   const params = new URLSearchParams(location.search);
-  if(params.get('error')){ showLanding(); $('login-err').textContent='Sign-in failed: '+params.get('error'); $('login-err').classList.remove('hidden'); history.replaceState({},'', '/'); }
+  if(params.get('error')){ const errs={not_allowed:'This account isn\'t approved for access. Contact the administrator.',no_userinfo:'Could not read your Google profile. Try again.'}; showLanding(); $('login-err').textContent=errs[params.get('error')]||('Sign-in failed: '+params.get('error')); $('login-err').classList.remove('hidden'); history.replaceState({},'', '/'); }
   let me=null;
   try { me = await api('/api/auth/me'); } catch {}
   if(me){ applyUser(me); showApp(); boot(); return; }

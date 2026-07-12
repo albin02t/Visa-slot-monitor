@@ -80,6 +80,57 @@ Open **`PUBLIC_BASE_URL`** in your browser and sign in with Google.
 
 ---
 
+## Production deployment (private group, HTTPS)
+
+For a small private deployment reachable over the internet, use the prod overlay
+which adds [Caddy](https://caddyserver.com) for automatic HTTPS.
+
+### 1. Point a domain at your server
+
+Create a DNS **A record** (e.g. `slots.yourdomain.com`) pointing to the host's IP.
+
+### 2. Configure `.env`
+
+```env
+DOMAIN=slots.yourdomain.com
+PUBLIC_BASE_URL=https://slots.yourdomain.com
+COOKIE_SECURE=1
+ALLOWED_EMAILS=you@gmail.com,friend@gmail.com   # only these can sign in
+JWT_SECRET=<python3 -c "import secrets; print(secrets.token_urlsafe(48))">
+POSTGRES_PASSWORD=<a strong password>
+GOOGLE_CLIENT_ID=...
+GOOGLE_CLIENT_SECRET=...
+```
+
+Add `https://slots.yourdomain.com/api/auth/callback` to your Google OAuth
+**Authorized redirect URIs**.
+
+### 3. Launch with the prod overlay
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+docker compose exec ollama ollama pull gemma3:4b
+```
+
+Caddy fetches a Let's Encrypt certificate automatically. Only ports 80/443 are
+exposed; the app itself is not published directly.
+
+### Production notes
+
+- **Access control:** `ALLOWED_EMAILS` is what makes it private — without it, any
+  Google account can sign in. Set it.
+- **Self-healing:** on startup the server resumes monitors/forwarders for all
+  configured users, so a reboot or redeploy brings everyone back automatically.
+- **Health check:** `GET /healthz` returns `200` for uptime monitoring.
+- **Backups:** back up the `pg_data` (accounts/config/history) and `app_data`
+  (Telegram + WhatsApp sessions) volumes.
+- **Scale:** each active user runs their own Telegram session + Chromium (WhatsApp
+  Web), so one host suits a small group (~10–30 users), not a public audience.
+- **Further hardening to consider:** encrypt per-user secrets at rest, add Alembic
+  migrations, and wire error tracking (e.g. Sentry).
+
+---
+
 ## Using the app
 
 1. **Sign in** with Google.

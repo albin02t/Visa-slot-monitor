@@ -18,6 +18,16 @@ COOKIE_SECURE = os.environ.get("COOKIE_SECURE", "0") == "1"
 # Local-dev escape hatch so the app is runnable before Google credentials exist.
 ALLOW_DEV_LOGIN = os.environ.get("ALLOW_DEV_LOGIN", "0") == "1"
 
+# Restrict sign-in to an approved set of emails (private deployment). When empty,
+# sign-in is open to any Google account — set this in production.
+ALLOWED_EMAILS = {e.strip().lower() for e in os.environ.get("ALLOWED_EMAILS", "").split(",") if e.strip()}
+
+
+def is_email_allowed(email: str) -> bool:
+    if not ALLOWED_EMAILS:
+        return True  # open mode (no allowlist configured)
+    return (email or "").lower() in ALLOWED_EMAILS
+
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
 GOOGLE_CONFIGURED = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
