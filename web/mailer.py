@@ -49,7 +49,7 @@ def send_welcome(to: str, name: str | None) -> None:
         "Welcome to Visa Slot Monitor",
         f"Hi {name or 'there'},\n\n"
         "Your Visa Slot Monitor account is ready. Sign in, complete the setup wizard "
-        "(Telegram, Twilio, checkvisaslots.com), and start your monitor to begin "
-        "receiving WhatsApp alerts the moment visa interview slots open.\n\n"
+        "(Telegram, checkvisaslots.com, alerts), and your monitor will begin "
+        "sending you Telegram alerts the moment visa interview slots open.\n\n"
         "— Visa Slot Monitor",
     )

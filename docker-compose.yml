@@ -1,11 +1,11 @@
 services:
   app:
     build: .
-    init: true                  # reap zombie Chromium processes from the forwarder
+    init: true                  # reap zombie child processes cleanly
     ports:
       - "${PORT:-8000}:8000"
     volumes:
-      - app_data:/data            # per-user sessions, wwebjs auth, env files
+      - app_data:/data            # per-user Telegram sessions + env files
     environment:
       - DATA_DIR=/data
       # DB connection built from parts in web/db.py (password is URL-encoded,
@@ -30,15 +30,15 @@ services:
       - SMTP_USER=${SMTP_USER:-}
       - SMTP_PASSWORD=${SMTP_PASSWORD:-}
       - SMTP_FROM=${SMTP_FROM:-}
-      # --- Runtime (Ollama is managed by us, not user-configurable) ---
-      - OLLAMA_URL=http://ollama:11434/api/chat
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma3:4b}
-      - PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+      # --- Telegram alert bot (create via @BotFather, one bot for all users) ---
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN:-}
+      # --- Cloud LLM for message classification (OpenAI-compatible; Groq default) ---
+      - LLM_API_URL=${LLM_API_URL:-https://api.groq.com/openai/v1/chat/completions}
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_MODEL=${LLM_MODEL:-llama-3.1-8b-instant}
     depends_on:
       postgres:
         condition: service_healthy
-      ollama:
-        condition: service_started
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"]
       interval: 30s
@@ -62,23 +62,6 @@ services:
       retries: 10
     restart: unless-stopped
 
-  ollama:
-    image: ollama/ollama
-    expose:
-      - "11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    restart: unless-stopped
-    # Uncomment for GPU acceleration:
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
-
 volumes:
   app_data:
   pg_data:
-  ollama_data:

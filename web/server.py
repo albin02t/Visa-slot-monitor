@@ -1,7 +1,8 @@
 """Multi-tenant FastAPI server for Visa Slot Monitor.
 
 Each user authenticates with Google, stores their own config in Postgres, and
-runs their own monitor/forwarder processes in an isolated per-user data dir.
+runs their own monitor process in an isolated per-user data dir. Alerts are
+delivered through a shared Telegram bot (see web/tgbot.py).
 """
 import asyncio
 import json
@@ -13,7 +14,6 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from pathlib import Path
 
-import httpx
 from authlib.integrations.starlette_client import OAuthError
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse, StreamingResponse
@@ -24,7 +24,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from telethon import TelegramClient
 from telethon.errors import SessionPasswordNeededError
 
-from web import auth, mailer
+from web import auth, mailer, tgbot
 from web.db import Alert, CvsCheck, Session, TgEvent, User, init_db
 
 BASE_DIR = Path(__file__).parent.parent
@@ -33,19 +33,16 @@ USER_DATA_ROOT = DATA_DIR / "users"
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "http://localhost:8000")
 
 # Config keys a user is allowed to set (everything else is ignored).
-# Note: OLLAMA_MODEL / OLLAMA_URL are NOT user-configurable — they are set
-# globally by the deployment (compose env) and inherited by each subprocess.
+# Note: LLM_* / TELEGRAM_BOT_TOKEN are NOT user-configurable — they are set
+# globally by the deployment and inherited by each subprocess.
 CONFIG_KEYS = {
     "TELEGRAM_API_ID", "TELEGRAM_API_HASH", "TELEGRAM_CHANNELS",
-    "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_WHATSAPP_FROM", "ALERT_TO",
-    "TWILIO_SANDBOX_KEYWORD", "FORWARD_TO",
     "CVS_API_KEY", "CVS_LOCATIONS", "CVS_POLL_INTERVAL", "CVS_DURATION_DAYS",
 }
 
 # Minimum config required before the monitor process is useful.
 REQUIRED_MONITOR_KEYS = {
     "TELEGRAM_API_ID", "TELEGRAM_API_HASH", "TELEGRAM_CHANNELS",
-    "TWILIO_ACCOUNT_SID", "TWILIO_AUTH_TOKEN", "TWILIO_WHATSAPP_FROM", "ALERT_TO",
     "CVS_API_KEY",
 }
 
@@ -67,10 +64,9 @@ def write_user_env(uid: int, config: dict) -> None:
 # ---------------------------------------------------------------------------
 # Per-user process + log state
 # ---------------------------------------------------------------------------
-processes: dict[int, dict] = defaultdict(lambda: {"monitor": None, "forwarder": None})
+processes: dict[int, dict] = defaultdict(lambda: {"monitor": None})
 log_history: dict[int, list] = defaultdict(list)
 log_subs: dict[int, list[asyncio.Queue]] = defaultdict(list)
-forwarder_qr: dict[int, str | None] = {}  # latest WhatsApp Web QR per user
 _slot_accum: dict[int, bool] = defaultdict(bool)
 MAX_LOG = 1000
 
@@ -90,7 +86,7 @@ def _push_log(uid: int, event: dict) -> None:
 async def _parse(uid: int, line: str) -> None:
     now = datetime.utcnow()
     async with Session() as s:
-        if "WhatsApp alert sent" in line:
+        if "Alert sent —" in line:
             s.add(Alert(user_id=uid, ts=now,
                         source="api" if "source: api" in line else "telegram", body=line))
         elif "checkvisaslots.com — no open slots" in line:
@@ -116,9 +112,11 @@ async def _parse(uid: int, line: str) -> None:
         elif "checkvisaslots.com poll failed" in line:
             _slot_accum[uid] = False
             s.add(CvsCheck(user_id=uid, ts=now, status="error", detail=line))
-        elif re.search(r"\[.*?\] New message:", line):
+        elif re.search(r"\[[^\]]*\] New message:", line):
             _slot_accum[uid] = False
-            m = re.search(r"\[(.*?)\] New message: (.*)", line)
+            # [^\]]* keeps the match to the bracket right before "New message:",
+            # so "[INFO] [channel] New message:" captures just the channel.
+            m = re.search(r"\[([^\]]*)\] New message: (.*)", line)
             if m:
                 s.add(TgEvent(user_id=uid, ts=now, channel=m.group(1), preview=m.group(2)[:300]))
         elif "LLM verdict:" in line:
@@ -143,26 +141,19 @@ async def _tail(uid: int, name: str, proc) -> None:
         text = line.decode("utf-8", errors="replace").rstrip()
         if not text:
             continue
-        # Capture the WhatsApp Web QR for the UI (don't show the raw string in logs).
-        if text.startswith("WWEBJS_QR "):
-            forwarder_qr[uid] = text[len("WWEBJS_QR "):]
-            continue
-        if "WhatsApp Web connected" in text:
-            forwarder_qr[uid] = None
         _push_log(uid, {"ts": datetime.utcnow().isoformat(), "source": name, "text": text})
         try:
             await _parse(uid, text)
         except Exception:
             pass
-    if name == "forwarder":
-        forwarder_qr[uid] = None
     _push_log(uid, {"ts": datetime.utcnow().isoformat(), "source": name, "text": f"[{name} exited]"})
 
 
-def _spawn(uid: int, name: str, cmd: list[str], config: dict) -> None:
+def _spawn(uid: int, name: str, cmd: list[str], config: dict, alert_chat_id: str = "") -> None:
     import subprocess
     env = {**os.environ, **{k: v for k, v in config.items() if k in CONFIG_KEYS},
-           "DATA_DIR": str(user_dir(uid))}
+           "DATA_DIR": str(user_dir(uid)),
+           "ALERT_CHAT_ID": alert_chat_id}
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             cwd=str(BASE_DIR), env=env, bufsize=1)
     processes[uid][name] = proc
@@ -190,20 +181,19 @@ async def _tg_authorized(uid: int, cfg: dict) -> bool:
 
 
 async def _ensure_running(uid: int, cfg: dict) -> None:
-    """Idempotently start the user's processes when prerequisites are met.
-    The app manages these automatically — there are no manual controls."""
+    """Idempotently start the user's monitor when prerequisites are met.
+    The app manages this automatically — there are no manual controls."""
     cfg = cfg or {}
     write_user_env(uid, cfg)
     present = {k for k, v in cfg.items() if v}
 
-    # Forwarder needs the sandbox number + at least one forward target.
-    if cfg.get("TWILIO_WHATSAPP_FROM") and cfg.get("FORWARD_TO") and not _running(uid, "forwarder"):
-        _spawn(uid, "forwarder", ["node", str(BASE_DIR / "forwarder.js")], cfg)
-
-    # Monitor needs full config AND an authorized Telegram session.
+    # Monitor needs full config, an authorized Telegram session, and a linked
+    # alert chat (otherwise alerts would silently go nowhere).
     if REQUIRED_MONITOR_KEYS.issubset(present) and not _running(uid, "monitor"):
-        if await _tg_authorized(uid, cfg):
-            _spawn(uid, "monitor", [sys.executable, str(BASE_DIR / "monitor.py")], cfg)
+        chat_id = await tgbot.linked_chat_id(uid)
+        if chat_id and await _tg_authorized(uid, cfg):
+            _spawn(uid, "monitor", [sys.executable, str(BASE_DIR / "monitor.py")], cfg,
+                   alert_chat_id=chat_id)
 
 
 # ---------------------------------------------------------------------------
@@ -230,6 +220,7 @@ async def lifespan(app: FastAPI):
     USER_DATA_ROOT.mkdir(parents=True, exist_ok=True)
     await init_db()
     asyncio.create_task(_resume_all())
+    asyncio.create_task(tgbot.poll_updates())
     yield
     # Graceful shutdown — terminate all user subprocesses.
     for procs in processes.values():
@@ -366,59 +357,41 @@ async def ensure_processes(user: User = Depends(current_user)):
 
 @app.get("/api/status")
 async def status(user: User = Depends(current_user)):
-    cfg = user.config or {}
-    ollama_url = cfg.get("OLLAMA_URL") or os.environ.get("OLLAMA_URL", "http://localhost:11434/api/chat")
-    ollama_ok = False
-    try:
-        async with httpx.AsyncClient(timeout=3) as hc:
-            r = await hc.get(ollama_url.replace("/api/chat", "/api/tags"))
-            ollama_ok = r.status_code == 200
-    except Exception:
-        pass
     return {"monitor": _running(user.id, "monitor"),
-            "forwarder": _running(user.id, "forwarder"), "ollama": ollama_ok}
+            "alerts_linked": bool(user.alert_chat_id),
+            "bot_configured": tgbot.BOT_CONFIGURED,
+            "llm": bool(os.environ.get("LLM_API_KEY"))}
 
 
-@app.post("/api/monitor/start")
-async def start_monitor(user: User = Depends(current_user)):
-    if _running(user.id, "monitor"):
-        return {"ok": True}
-    cfg = user.config or {}
-    write_user_env(user.id, cfg)
-    _spawn(user.id, "monitor", [sys.executable, str(BASE_DIR / "monitor.py")], cfg)
+# ---------------------------------------------------------------------------
+# Alert bot linking
+# ---------------------------------------------------------------------------
+@app.post("/api/alerts/link")
+async def alerts_link(user: User = Depends(current_user)):
+    """Return a t.me deep-link the user opens to connect the alert bot."""
+    username = await tgbot.get_bot_username()
+    if not username:
+        raise HTTPException(status_code=503, detail="Alert bot is not configured on this server")
+    code = tgbot.new_link_code(user.id)
+    return {"url": f"https://t.me/{username}?start={code}"}
+
+
+@app.get("/api/alerts/status")
+async def alerts_status(user: User = Depends(current_user)):
+    chat_id = await tgbot.linked_chat_id(user.id)
+    return {"linked": bool(chat_id)}
+
+
+@app.post("/api/alerts/test")
+async def alerts_test(user: User = Depends(current_user)):
+    chat_id = await tgbot.linked_chat_id(user.id)
+    if not chat_id:
+        raise HTTPException(status_code=400, detail="Alerts not linked yet")
+    ok = await tgbot.send_message(chat_id,
+        "👋 *Test alert* — your Visa Slot Monitor alerts are working!")
+    if not ok:
+        raise HTTPException(status_code=502, detail="Failed to send test message")
     return {"ok": True}
-
-
-@app.post("/api/monitor/stop")
-async def stop_monitor(user: User = Depends(current_user)):
-    p = processes[user.id]["monitor"]
-    if p:
-        p.terminate()
-        processes[user.id]["monitor"] = None
-    return {"ok": True}
-
-
-@app.post("/api/forwarder/start")
-async def start_forwarder(user: User = Depends(current_user)):
-    if _running(user.id, "forwarder"):
-        return {"ok": True}
-    _spawn(user.id, "forwarder", ["node", str(BASE_DIR / "forwarder.js")], user.config or {})
-    return {"ok": True}
-
-
-@app.post("/api/forwarder/stop")
-async def stop_forwarder(user: User = Depends(current_user)):
-    p = processes[user.id]["forwarder"]
-    if p:
-        p.terminate()
-        processes[user.id]["forwarder"] = None
-    return {"ok": True}
-
-
-@app.get("/api/forwarder/qr")
-async def forwarder_qr_get(user: User = Depends(current_user)):
-    """Latest WhatsApp Web QR string for this user, or null if none pending."""
-    return {"qr": forwarder_qr.get(user.id)}
 
 
 @app.get("/api/logs/stream")

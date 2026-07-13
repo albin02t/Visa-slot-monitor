@@ -41,8 +41,10 @@ class User(Base):
     email: Mapped[str] = mapped_column(String(320), index=True)
     name: Mapped[str | None] = mapped_column(String(255), nullable=True)
     picture: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Per-user .env-style configuration (TELEGRAM_*, TWILIO_*, CVS_*, etc.)
+    # Per-user .env-style configuration (TELEGRAM_*, CVS_*, etc.)
     config: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
+    # Telegram chat id the alert bot delivers to (set via the bot /start link flow)
+    alert_chat_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -89,6 +91,11 @@ async def init_db(retries: int = 30, delay: float = 2.0) -> None:
         try:
             async with engine.begin() as conn:
                 await conn.run_sync(Base.metadata.create_all)
+                # Lightweight migration for pre-existing installs (create_all
+                # doesn't alter existing tables).
+                from sqlalchemy import text
+                await conn.execute(text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS alert_chat_id VARCHAR(32)"))
             log.info("Database ready (attempt %d)", attempt)
             return
         except Exception as e:  # noqa: BLE001 — DNS/connection not ready yet

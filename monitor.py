@@ -9,7 +9,6 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from telethon import TelegramClient, events
-from twilio.rest import Client as TwilioClient
 from slot_checker import poll_checkvisaslots
 
 DATA_DIR = Path(os.environ.get("DATA_DIR", Path(__file__).parent))
@@ -26,13 +25,15 @@ TELEGRAM_API_ID = int(os.environ["TELEGRAM_API_ID"])
 TELEGRAM_API_HASH = os.environ["TELEGRAM_API_HASH"]
 CHANNELS = [c.strip() for c in os.environ["TELEGRAM_CHANNELS"].split(",")]
 
-TWILIO_SID = os.environ["TWILIO_ACCOUNT_SID"]
-TWILIO_TOKEN = os.environ["TWILIO_AUTH_TOKEN"]
-TWILIO_FROM = os.environ["TWILIO_WHATSAPP_FROM"]
-ALERT_TO = os.environ["ALERT_TO"]
+# Alerts are delivered via the deployment's Telegram bot to the user's chat.
+BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+ALERT_CHAT_ID = os.environ["ALERT_CHAT_ID"]
 
-OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "gemma3:1b")
-OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434/api/chat")
+# Cloud LLM for message classification — any OpenAI-compatible chat endpoint
+# (Groq by default; also works with OpenRouter, Together, OpenAI, etc.)
+LLM_API_URL = os.environ.get("LLM_API_URL", "https://api.groq.com/openai/v1/chat/completions")
+LLM_API_KEY = os.environ.get("LLM_API_KEY", "")
+LLM_MODEL = os.environ.get("LLM_MODEL", "llama-3.1-8b-instant")
 
 SYSTEM_PROMPT = (
     "You monitor a Telegram channel for US F1 student visa interview slot availability. "
@@ -46,13 +47,17 @@ SYSTEM_PROMPT = (
     "When in doubt, reply NO. Reply with exactly one word: YES or NO."
 )
 
-twilio = TwilioClient(TWILIO_SID, TWILIO_TOKEN)
-
 recent_messages: dict[str, deque] = defaultdict(lambda: deque(maxlen=5))
 
 
 def is_slot_alert(channel: str, new_text: str) -> bool:
     if not new_text or len(new_text.strip()) < 5:
+        log.info("LLM verdict: SKIPPED (message too short)")
+        return False
+
+    if not LLM_API_KEY:
+        log.error("LLM_API_KEY not set — cannot classify messages")
+        log.info("LLM verdict: ERROR")
         return False
 
     recent_messages[channel].append(new_text)
@@ -61,31 +66,36 @@ def is_slot_alert(channel: str, new_text: str) -> bool:
     context = "\n\n".join(f"[Message {i+1}]: {msg[:500]}" for i, msg in enumerate(history))
 
     payload = json.dumps({
-        "model": OLLAMA_MODEL,
+        "model": LLM_MODEL,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": context},
         ],
-        "stream": False,
+        "temperature": 0,
+        "max_tokens": 3,
     }).encode()
 
     try:
         req = urllib.request.Request(
-            OLLAMA_URL,
+            LLM_API_URL,
             data=payload,
-            headers={"Content-Type": "application/json"},
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {LLM_API_KEY}",
+            },
         )
-        with urllib.request.urlopen(req, timeout=15) as resp:
+        with urllib.request.urlopen(req, timeout=30) as resp:
             result = json.loads(resp.read())
-        answer = result["message"]["content"].strip().upper()
+        answer = result["choices"][0]["message"]["content"].strip().upper()
         log.info("LLM verdict: %s", answer)
         return answer.startswith("YES")
     except Exception as e:
-        log.error("Ollama call failed: %s — skipping message", e)
+        log.error("LLM call failed: %s — skipping message", e)
+        log.info("LLM verdict: ERROR")
         return False
 
 
-def send_whatsapp_alert(message_text: str, source: str = "telegram", context_window: list[str] | None = None) -> None:
+def send_alert(message_text: str, source: str = "telegram", context_window: list[str] | None = None) -> None:
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     if source == "api":
         body = (
@@ -104,8 +114,13 @@ def send_whatsapp_alert(message_text: str, source: str = "telegram", context_win
             f"Time: {now}\n\n"
             f"{msgs}"
         )
-    twilio.messages.create(from_=TWILIO_FROM, to=ALERT_TO, body=body)
-    log.info("WhatsApp alert sent — source: %s", source)
+    payload = json.dumps({"chat_id": ALERT_CHAT_ID, "text": body, "parse_mode": "Markdown"}).encode()
+    req = urllib.request.Request(
+        f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
+        data=payload, headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        resp.read()
+    log.info("Alert sent — source: %s", source)
 
 
 async def main() -> None:
@@ -144,18 +159,18 @@ async def main() -> None:
         log.info("[%s] New message: %s", channel_name, text[:120].replace("\n", " "))
 
         if is_slot_alert(channel_name, text):
-            log.info("SLOT ALERT detected in %s — sending WhatsApp notification", channel_name)
+            log.info("SLOT ALERT detected in %s — sending alert", channel_name)
             try:
                 window = list(recent_messages[channel_name])
-                send_whatsapp_alert(text, source="telegram", context_window=window)
+                send_alert(text, source="telegram", context_window=window)
             except Exception as e:
-                log.error("Failed to send WhatsApp alert: %s", e)
+                log.error("Failed to send alert: %s", e)
 
     async def on_api_slots_found(summary: str) -> None:
         try:
-            send_whatsapp_alert(summary, source="api")
+            send_alert(summary, source="api")
         except Exception as e:
-            log.error("Failed to send API slot WhatsApp alert: %s", e)
+            log.error("Failed to send API slot alert: %s", e)
 
     log.info("Listening for messages. Press Ctrl+C to stop.")
     await asyncio.gather(

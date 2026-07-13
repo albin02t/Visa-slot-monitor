@@ -1,8 +1,5 @@
-node_modules/
 venv/
 __pycache__/
-.wwebjs_auth/
-.wwebjs_cache/
 visa_monitor_session.session
 .alerted_slots.json
 web/events.db
