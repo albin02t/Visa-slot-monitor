@@ -83,7 +83,9 @@
       <div class="flex items-center gap-2.5">
         <span class="text-2xl">🛂</span>
         <span class="font-bold text-white">Visa Slot Monitor</span>
+        <span class="text-[10px] text-slate-600 border border-slate-800 rounded-full px-2 py-0.5 ml-1">by Toule Labs</span>
       </div>
+      <button onclick="location.href='/api/auth/login'" class="btn-ghost text-xs">Sign in</button>
     </div>
 
     <!-- hero -->
@@ -114,12 +116,27 @@
         <!-- feature row -->
         <div class="grid sm:grid-cols-3 gap-3 mt-14 text-left">
           <div class="card-sm p-4"><p class="text-green-400 text-sm font-semibold mb-1">🌐 API polling</p><p class="text-xs text-slate-500">Confirmed open slots from checkvisaslots.com on your schedule.</p></div>
-          <div class="card-sm p-4"><p class="text-blue-400 text-sm font-semibold mb-1">💬 AI Telegram filter</p><p class="text-xs text-slate-500">A local LLM separates real announcements from noise.</p></div>
+          <div class="card-sm p-4"><p class="text-blue-400 text-sm font-semibold mb-1">💬 AI Telegram filter</p><p class="text-xs text-slate-500">AI reads channel chatter in context and flags only real "slots open now" messages.</p></div>
           <div class="card-sm p-4"><p class="text-yellow-400 text-sm font-semibold mb-1">🔔 Instant Telegram alerts</p><p class="text-xs text-slate-500">One tap to connect our bot — alerts arrive in seconds, free forever.</p></div>
+        </div>
+
+        <!-- how it works -->
+        <div class="mt-14 text-left">
+          <p class="text-center text-[11px] uppercase tracking-widest text-slate-600 font-bold mb-5">Up and running in 5 minutes</p>
+          <div class="grid sm:grid-cols-4 gap-3">
+            <div class="card-sm p-4"><p class="text-slate-600 text-xs font-bold mb-1">1</p><p class="text-xs text-slate-400"><strong class="text-slate-200">Sign in</strong> with your Google account.</p></div>
+            <div class="card-sm p-4"><p class="text-slate-600 text-xs font-bold mb-1">2</p><p class="text-xs text-slate-400"><strong class="text-slate-200">Link Telegram</strong> — guided wizard, OTP right in the browser.</p></div>
+            <div class="card-sm p-4"><p class="text-slate-600 text-xs font-bold mb-1">3</p><p class="text-xs text-slate-400"><strong class="text-slate-200">Connect the bot</strong> — one tap, press Start.</p></div>
+            <div class="card-sm p-4"><p class="text-slate-600 text-xs font-bold mb-1">4</p><p class="text-xs text-slate-400"><strong class="text-slate-200">Relax</strong> — your monitor runs 24/7 and pings you first.</p></div>
+          </div>
         </div>
       </div>
     </div>
-    <p class="text-center text-slate-700 text-xs pb-6">Visa Slot Monitor</p>
+    <div class="text-center text-slate-700 text-xs pb-6 space-x-3">
+      <span>© Toule Labs</span><span>·</span>
+      <a href="/terms.html" class="hover:text-slate-500">Terms</a><span>·</span>
+      <a href="/privacy.html" class="hover:text-slate-500">Privacy</a>
+    </div>
   </div>
 </div>
 
@@ -231,7 +248,7 @@ function showApp(){$('landing').classList.add('hidden');$('app').classList.remov
 
 async function initAuth(){
   const params = new URLSearchParams(location.search);
-  if(params.get('error')){ const errs={not_allowed:'This account isn\'t approved for access. Contact the administrator.',no_userinfo:'Could not read your Google profile. Try again.'}; showLanding(); $('login-err').textContent=errs[params.get('error')]||('Sign-in failed: '+params.get('error')); $('login-err').classList.remove('hidden'); history.replaceState({},'', '/'); }
+  if(params.get('error')){ const errs={not_allowed:'This account isn\'t approved for access. Contact the administrator.',no_userinfo:'Could not read your Google profile. Try again.',full:'We\'re at capacity right now — signups are temporarily closed. Check back soon!'}; showLanding(); $('login-err').textContent=errs[params.get('error')]||('Sign-in failed: '+params.get('error')); $('login-err').classList.remove('hidden'); history.replaceState({},'', '/'); }
   let me=null;
   try { me = await api('/api/auth/me'); } catch {}
   if(me){ applyUser(me); showApp(); boot(); return; }

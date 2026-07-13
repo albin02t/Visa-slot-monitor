@@ -31,6 +31,9 @@ BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = Path(os.environ.get("DATA_DIR", str(BASE_DIR)))
 USER_DATA_ROOT = DATA_DIR / "users"
 PUBLIC_BASE_URL = os.environ.get("PUBLIC_BASE_URL", "http://localhost:8000")
+# Cap total accounts — each active user runs a monitor subprocess, so open
+# signup on a small host needs a ceiling.
+MAX_USERS = int(os.environ.get("MAX_USERS", "25"))
 
 # Config keys a user is allowed to set (everything else is ignored).
 # Note: LLM_* / TELEGRAM_BOT_TOKEN are NOT user-configurable — they are set
@@ -278,6 +281,15 @@ async def auth_callback(request: Request):
         return RedirectResponse("/?error=no_userinfo")
     if not auth.is_email_allowed(info.get("email", "")):
         return RedirectResponse("/?error=not_allowed")
+    # Enforce the account cap for brand-new signups (existing users always get in).
+    async with Session() as s:
+        existing = (await s.execute(
+            select(User).where(User.google_sub == info["sub"]))).scalar_one_or_none()
+        if existing is None:
+            from sqlalchemy import func as sqlfunc
+            count = (await s.execute(select(sqlfunc.count(User.id)))).scalar_one()
+            if count >= MAX_USERS:
+                return RedirectResponse("/?error=full")
     user = await auth.upsert_user(
         google_sub=info["sub"], email=info.get("email", ""),
         name=info.get("name"), picture=info.get("picture"))

@@ -24,6 +24,8 @@ services:
       - ALLOW_DEV_LOGIN=${ALLOW_DEV_LOGIN:-0}
       # Restrict sign-in to these emails (comma-separated). Empty = open to anyone.
       - ALLOWED_EMAILS=${ALLOWED_EMAILS:-}
+      # Max total accounts (each user runs a monitor process)
+      - MAX_USERS=${MAX_USERS:-25}
       # --- Transactional email (SMTP) ---
       - SMTP_HOST=${SMTP_HOST:-}
       - SMTP_PORT=${SMTP_PORT:-587}
