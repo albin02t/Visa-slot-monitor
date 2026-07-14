@@ -152,14 +152,19 @@ async def _tail(uid: int, name: str, proc) -> None:
     _push_log(uid, {"ts": datetime.utcnow().isoformat(), "source": name, "text": f"[{name} exited]"})
 
 
+process_started: dict[int, float] = {}  # uid -> monitor start timestamp
+
+
 def _spawn(uid: int, name: str, cmd: list[str], config: dict, alert_chat_id: str = "") -> None:
     import subprocess
+    import time
     env = {**os.environ, **{k: v for k, v in config.items() if k in CONFIG_KEYS},
            "DATA_DIR": str(user_dir(uid)),
            "ALERT_CHAT_ID": alert_chat_id}
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             cwd=str(BASE_DIR), env=env, bufsize=1)
     processes[uid][name] = proc
+    process_started[uid] = time.time()
     asyncio.create_task(_tail(uid, name, proc))
 
 
@@ -369,7 +374,11 @@ async def ensure_processes(user: User = Depends(current_user)):
 
 @app.get("/api/status")
 async def status(user: User = Depends(current_user)):
-    return {"monitor": _running(user.id, "monitor"),
+    import time
+    running = _running(user.id, "monitor")
+    uptime = int(time.time() - process_started[user.id]) if running and user.id in process_started else 0
+    return {"monitor": running,
+            "monitor_uptime": uptime,
             "alerts_linked": bool(user.alert_chat_id),
             "bot_configured": tgbot.BOT_CONFIGURED,
             "llm": bool(os.environ.get("LLM_API_KEY"))}

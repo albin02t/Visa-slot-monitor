@@ -1,11 +1,11 @@
 import os
 import asyncio
 import logging
-import urllib.request
-import json
 from collections import defaultdict, deque
 from datetime import datetime
 from pathlib import Path
+
+import httpx
 
 from dotenv import load_dotenv
 from telethon import TelegramClient, events
@@ -65,28 +65,25 @@ def is_slot_alert(channel: str, new_text: str) -> bool:
 
     context = "\n\n".join(f"[Message {i+1}]: {msg[:500]}" for i, msg in enumerate(history))
 
-    payload = json.dumps({
-        "model": LLM_MODEL,
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": context},
-        ],
-        "temperature": 0,
-        "max_tokens": 3,
-    }).encode()
-
     try:
-        req = urllib.request.Request(
+        # httpx, not urllib — Cloudflare (fronting Groq) 403-blocks the
+        # default Python-urllib User-Agent.
+        r = httpx.post(
             LLM_API_URL,
-            data=payload,
-            headers={
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {LLM_API_KEY}",
+            timeout=30,
+            headers={"Authorization": f"Bearer {LLM_API_KEY}"},
+            json={
+                "model": LLM_MODEL,
+                "messages": [
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": context},
+                ],
+                "temperature": 0,
+                "max_tokens": 3,
             },
         )
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            result = json.loads(resp.read())
-        answer = result["choices"][0]["message"]["content"].strip().upper()
+        r.raise_for_status()
+        answer = r.json()["choices"][0]["message"]["content"].strip().upper()
         log.info("LLM verdict: %s", answer)
         return answer.startswith("YES")
     except Exception as e:
@@ -114,12 +111,11 @@ def send_alert(message_text: str, source: str = "telegram", context_window: list
             f"Time: {now}\n\n"
             f"{msgs}"
         )
-    payload = json.dumps({"chat_id": ALERT_CHAT_ID, "text": body, "parse_mode": "Markdown"}).encode()
-    req = urllib.request.Request(
+    r = httpx.post(
         f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage",
-        data=payload, headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=15) as resp:
-        resp.read()
+        json={"chat_id": ALERT_CHAT_ID, "text": body, "parse_mode": "Markdown"},
+        timeout=15)
+    r.raise_for_status()
     log.info("Alert sent — source: %s", source)
 
 
