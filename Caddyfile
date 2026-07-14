@@ -1,6 +1,16 @@
-# Caddy auto-provisions and renews a Let's Encrypt TLS cert for $DOMAIN.
-# Set DOMAIN in your .env (e.g. slots.toulelabs.com) with DNS pointing here.
+# Caddy auto-provisions and renews Let's Encrypt TLS certs for every site block.
+# {$DOMAIN} = the slots app (set DOMAIN in .env); toulelabs.dev = the brand homepage.
 {$DOMAIN} {
 	encode gzip
 	reverse_proxy app:8000
+}
+
+toulelabs.dev {
+	encode gzip
+	root * /srv/homepage
+	file_server
+}
+
+www.toulelabs.dev {
+	redir https://toulelabs.dev{uri} permanent
 }

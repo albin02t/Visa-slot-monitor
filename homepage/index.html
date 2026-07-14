@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Toule Labs — tiny lab, ridiculously useful tools</title>
+<meta name="description" content="Toule Labs builds small, sharp, ridiculously useful tools. Home of Visa Slot Monitor.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧪</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@400;600;800;900&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0e0b16; --paper:#0e0b16; --cream:#fdf6ec;
+    --pink:#ff4fa3; --orange:#ff8a3d; --yellow:#ffd23f; --lime:#a6f750; --cyan:#3de8ff; --purple:#9b5bff;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{background:var(--paper);color:#f3eefc;font-family:'Space Grotesk',sans-serif;overflow-x:hidden;font-size:17px;line-height:1.6}
+  ::selection{background:var(--yellow);color:var(--ink)}
+  a{color:inherit}
+  .disp{font-family:'Unbounded',sans-serif}
+
+  /* floating neon blobs */
+  .blob{position:fixed;border-radius:50%;filter:blur(90px);opacity:.5;z-index:0;pointer-events:none;animation:drift 22s ease-in-out infinite alternate}
+  .b1{width:520px;height:520px;background:var(--pink);top:-160px;left:-120px}
+  .b2{width:460px;height:460px;background:var(--purple);top:30%;right:-180px;animation-delay:-7s}
+  .b3{width:420px;height:420px;background:var(--cyan);bottom:-140px;left:22%;animation-delay:-13s;opacity:.35}
+  @keyframes drift{from{transform:translate(0,0) scale(1)}to{transform:translate(70px,50px) scale(1.15)}}
+
+  .wrap{position:relative;z-index:1;max-width:1080px;margin:0 auto;padding:0 24px}
+
+  /* nav */
+  nav{display:flex;align-items:center;justify-content:space-between;padding:26px 0}
+  .logo{font-family:'Unbounded';font-weight:900;font-size:20px;letter-spacing:-.02em;
+    background:linear-gradient(90deg,var(--pink),var(--orange),var(--yellow));-webkit-background-clip:text;background-clip:text;color:transparent}
+  .navlinks{display:flex;gap:22px;font-size:14.5px;font-weight:600}
+  .navlinks a{text-decoration:none;opacity:.75;transition:.2s}
+  .navlinks a:hover{opacity:1;color:var(--yellow)}
+
+  /* hero */
+  .hero{padding:72px 0 40px;text-align:center}
+  .eyebrow{display:inline-block;font-size:13px;font-weight:700;letter-spacing:.18em;text-transform:uppercase;
+    border:2px solid var(--lime);color:var(--lime);border-radius:99px;padding:7px 18px;margin-bottom:30px;
+    box-shadow:4px 4px 0 var(--lime);background:rgba(166,247,80,.06)}
+  h1{font-family:'Unbounded';font-weight:900;font-size:clamp(44px,9vw,104px);line-height:1.02;letter-spacing:-.03em}
+  h1 .grad{background:linear-gradient(93deg,var(--pink) 0%,var(--orange) 30%,var(--yellow) 55%,var(--lime) 80%,var(--cyan) 100%);
+    -webkit-background-clip:text;background-clip:text;color:transparent}
+  .sub{max-width:560px;margin:26px auto 0;font-size:clamp(16px,2.4vw,20px);color:#cfc6e4}
+  .sub b{color:#fff}
+
+  /* marquee */
+  .marquee{margin:64px 0 0;border-top:3px solid #fff;border-bottom:3px solid #fff;transform:rotate(-1.6deg);
+    background:linear-gradient(90deg,var(--pink),var(--purple));overflow:hidden;white-space:nowrap}
+  .marquee-inner{display:inline-block;padding:12px 0;animation:scroll 22s linear infinite;
+    font-family:'Unbounded';font-weight:800;font-size:15px;letter-spacing:.1em;color:var(--ink)}
+  .marquee-inner span{margin:0 22px;color:#fff}
+  .marquee-inner span:nth-child(odd){color:var(--ink)}
+  @keyframes scroll{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+  /* sections */
+  section{padding:84px 0 0}
+  .sec-title{font-family:'Unbounded';font-weight:800;font-size:clamp(24px,4.4vw,38px);margin-bottom:8px}
+  .sec-kick{font-size:13px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;margin-bottom:10px}
+
+  /* product cards */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:26px;margin-top:36px}
+  .card{border:3px solid #fff;border-radius:22px;padding:30px;position:relative;background:#171226;
+    transition:transform .18s, box-shadow .18s;text-decoration:none;display:block}
+  .card:hover{transform:translate(-4px,-4px) rotate(-.4deg)}
+  .card.live{box-shadow:9px 9px 0 var(--cyan)}
+  .card.live:hover{box-shadow:14px 14px 0 var(--cyan)}
+  .card.soon{box-shadow:9px 9px 0 var(--purple);border-style:dashed;opacity:.85}
+  .card.soon:hover{box-shadow:14px 14px 0 var(--purple)}
+  .card .emoji{font-size:38px}
+  .card h3{font-family:'Unbounded';font-weight:800;font-size:21px;margin:16px 0 8px}
+  .card p{font-size:15px;color:#cfc6e4}
+  .pill{position:absolute;top:-15px;right:22px;font-family:'Unbounded';font-weight:800;font-size:11px;
+    letter-spacing:.12em;padding:7px 14px;border-radius:99px;border:2.5px solid var(--ink)}
+  .pill.live{background:var(--lime);color:var(--ink);animation:bounce 2.2s ease-in-out infinite}
+  .pill.soon{background:var(--yellow);color:var(--ink)}
+  @keyframes bounce{0%,100%{transform:translateY(0)}50%{transform:translateY(-4px)}}
+  .card .cta{display:inline-block;margin-top:18px;font-weight:700;font-size:14.5px;color:var(--cyan)}
+  .card.soon .cta{color:var(--purple)}
+
+  /* stats */
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:22px;margin-top:36px}
+  .stat{border:3px solid #fff;border-radius:22px;padding:26px 22px;text-align:center;transform:rotate(-1deg);transition:transform .18s}
+  .stat:nth-child(even){transform:rotate(1.2deg)}
+  .stat:hover{transform:rotate(0) scale(1.04)}
+  .stat .num{font-family:'Unbounded';font-weight:900;font-size:clamp(30px,5vw,44px);line-height:1}
+  .stat .lbl{margin-top:10px;font-size:13px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#cfc6e4}
+  .stat:nth-child(1){background:rgba(255,79,163,.1);box-shadow:7px 7px 0 var(--pink)}.stat:nth-child(1) .num{color:var(--pink)}
+  .stat:nth-child(2){background:rgba(61,232,255,.08);box-shadow:7px 7px 0 var(--cyan)}.stat:nth-child(2) .num{color:var(--cyan)}
+  .stat:nth-child(3){background:rgba(255,210,63,.08);box-shadow:7px 7px 0 var(--yellow)}.stat:nth-child(3) .num{color:var(--yellow)}
+  .stat:nth-child(4){background:rgba(166,247,80,.08);box-shadow:7px 7px 0 var(--lime)}.stat:nth-child(4) .num{color:var(--lime)}
+  .stats-note{margin-top:18px;font-size:13px;color:#8f84ad}
+
+  /* founder */
+  .founder{display:flex;flex-wrap:wrap;align-items:center;gap:34px;margin-top:36px;border:3px solid #fff;
+    border-radius:26px;padding:36px;background:#171226;box-shadow:10px 10px 0 var(--orange)}
+  .avatar{width:110px;height:110px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
+    font-family:'Unbounded';font-weight:900;font-size:40px;color:var(--ink);
+    background:conic-gradient(from 120deg,var(--pink),var(--orange),var(--yellow),var(--lime),var(--cyan),var(--purple),var(--pink));
+    border:3px solid #fff;animation:spin 14s linear infinite}
+  .avatar span{animation:spin 14s linear infinite reverse}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .founder h3{font-family:'Unbounded';font-weight:800;font-size:24px}
+  .founder .role{color:var(--orange);font-weight:700;font-size:14px;letter-spacing:.14em;text-transform:uppercase;margin:4px 0 10px}
+  .founder p{font-size:15.5px;color:#cfc6e4;max-width:520px}
+  .socials{display:flex;gap:12px;margin-top:16px;flex-wrap:wrap}
+  .soc{display:inline-flex;align-items:center;gap:8px;text-decoration:none;font-weight:700;font-size:14px;
+    border:2.5px solid #fff;border-radius:12px;padding:9px 16px;transition:.18s;background:#0e0b16}
+  .soc:hover{transform:translate(-2px,-2px)}
+  .soc.gh:hover{box-shadow:5px 5px 0 var(--lime);color:var(--lime)}
+  .soc.li:hover{box-shadow:5px 5px 0 var(--cyan);color:var(--cyan)}
+  .soc.tw:hover{box-shadow:5px 5px 0 var(--pink);color:var(--pink)}
+
+  footer{margin-top:96px;border-top:3px solid #fff;padding:34px 0 44px;text-align:center;font-size:14px;color:#8f84ad}
+  footer .heart{color:var(--pink)}
+  footer a{color:#cfc6e4}
+</style>
+</head>
+<body>
+<div class="blob b1"></div><div class="blob b2"></div><div class="blob b3"></div>
+
+<div class="wrap">
+  <nav>
+    <span class="logo">TOULE LABS</span>
+    <div class="navlinks">
+      <a href="#products">Products</a>
+      <a href="#stats">Stats</a>
+      <a href="#founder">Founder</a>
+    </div>
+  </nav>
+
+  <div class="hero">
+    <span class="eyebrow">🧪 a tiny lab · est. 2026</span>
+    <h1>We build<br><span class="grad">ridiculously useful</span><br>little tools</h1>
+    <p class="sub">Toule Labs ships small, sharp software that solves <b>one real problem absurdly well</b> — starting with never missing a US visa interview slot again.</p>
+  </div>
+</div>
+
+<div class="marquee"><div class="marquee-inner">
+  <span>TOULE LABS</span><span>✦</span><span>USEFUL &gt; SHINY</span><span>✦</span><span>SHIP SMALL, SHIP SHARP</span><span>✦</span><span>MADE WITH CAFFEINE</span><span>✦</span>
+  <span>TOULE LABS</span><span>✦</span><span>USEFUL &gt; SHINY</span><span>✦</span><span>SHIP SMALL, SHIP SHARP</span><span>✦</span><span>MADE WITH CAFFEINE</span><span>✦</span>
+</div></div>
+
+<div class="wrap">
+  <section id="products">
+    <p class="sec-kick" style="color:var(--cyan)">The lineup</p>
+    <h2 class="sec-title">Apps under the umbrella ☂️</h2>
+    <div class="cards">
+      <a class="card live" href="https://slots.toulelabs.dev">
+        <span class="pill live">● LIVE</span>
+        <div class="emoji">🛰️</div>
+        <h3>Visa Slot Monitor</h3>
+        <p>A 24/7 radar for US F1 visa interview slots. Watches checkvisaslots.com and Telegram channels, filters the noise with AI, and pings your Telegram the instant slots open.</p>
+        <span class="cta">Launch the radar →</span>
+      </a>
+      <div class="card soon">
+        <span class="pill soon">COOKING</span>
+        <div class="emoji">🍳</div>
+        <h3>Experiment #002</h3>
+        <p>Something else ridiculously useful is brewing in the lab. It'll be small, it'll be sharp, and it'll probably have an animated dashboard because we can't help ourselves.</p>
+        <span class="cta">Stay tuned…</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="stats">
+    <p class="sec-kick" style="color:var(--yellow)">Live from production</p>
+    <h2 class="sec-title">Numbers that go up 📈</h2>
+    <div class="stats">
+      <div class="stat"><div class="num" id="st-users">—</div><div class="lbl">Radar operators</div></div>
+      <div class="stat"><div class="num" id="st-alerts">—</div><div class="lbl">Alerts delivered</div></div>
+      <div class="stat"><div class="num" id="st-sweeps">—</div><div class="lbl">API sweeps run</div></div>
+      <div class="stat"><div class="num" id="st-signals">—</div><div class="lbl">Signals analyzed by AI</div></div>
+    </div>
+    <p class="stats-note">↑ real numbers, straight from the Visa Slot Monitor database. Refreshes every minute.</p>
+  </section>
+
+  <section id="founder">
+    <p class="sec-kick" style="color:var(--orange)">The human</p>
+    <h2 class="sec-title">Founder & chief tinkerer</h2>
+    <div class="founder">
+      <div class="avatar"><span>AT</span></div>
+      <div>
+        <h3>Albin Thomas</h3>
+        <div class="role">Founder, Toule Labs</div>
+        <p>Builds tools he wishes existed, then gives them to everyone else with the same problem. Currently making sure no student ever refreshes a visa portal at 3am again.</p>
+        <div class="socials">
+          <a class="soc gh" href="https://github.com/albin02t" target="_blank" rel="noopener">⌥ GitHub</a>
+          <a class="soc li" href="#" data-fill="linkedin">in LinkedIn</a>
+          <a class="soc tw" href="#" data-fill="twitter">𝕏 Twitter</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    <p>© 2026 Toule Labs · made with <span class="heart">♥</span> and questionable amounts of caffeine</p>
+    <p style="margin-top:8px"><a href="mailto:toulelabs@gmail.com">toulelabs@gmail.com</a> · <a href="https://slots.toulelabs.dev/terms.html">Terms</a> · <a href="https://slots.toulelabs.dev/privacy.html">Privacy</a></p>
+  </footer>
+</div>
+
+<script>
+// animated counters fed by real production stats
+function countUp(el, target){
+  const t0 = performance.now(), dur = 1400, from = 0;
+  (function tick(now){
+    const p = Math.min((now - t0) / dur, 1);
+    el.textContent = Math.round(from + (target - from) * (1 - Math.pow(1 - p, 3))).toLocaleString();
+    if (p < 1) requestAnimationFrame(tick);
+  })(t0);
+}
+async function loadStats(){
+  try{
+    const r = await fetch('https://slots.toulelabs.dev/api/public-stats');
+    const s = await r.json();
+    countUp(document.getElementById('st-users'),   s.users);
+    countUp(document.getElementById('st-alerts'),  s.alerts);
+    countUp(document.getElementById('st-sweeps'),  s.sweeps);
+    countUp(document.getElementById('st-signals'), s.signals);
+  }catch(e){
+    ['st-users','st-alerts','st-sweeps','st-signals'].forEach(id=>document.getElementById(id).textContent='∞');
+  }
+}
+loadStats();
+setInterval(loadStats, 60000);
+</script>
+</body>
+</html>

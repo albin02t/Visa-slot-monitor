@@ -246,6 +246,20 @@ app = FastAPI(title="Visa Slot Monitor", lifespan=lifespan)
 @app.get("/healthz")
 async def healthz():
     return {"ok": True}
+
+
+@app.get("/api/public-stats")
+async def public_stats():
+    """Aggregate, non-sensitive metrics for the toulelabs.dev homepage."""
+    from sqlalchemy import func as safunc
+    async with Session() as s:
+        users = (await s.execute(select(safunc.count(User.id)))).scalar_one()
+        alerts = (await s.execute(select(safunc.count(Alert.id)))).scalar_one()
+        sweeps = (await s.execute(select(safunc.count(CvsCheck.id)))).scalar_one()
+        signals = (await s.execute(select(safunc.count(TgEvent.id)))).scalar_one()
+    return JSONResponse(
+        {"users": users, "alerts": alerts, "sweeps": sweeps, "signals": signals},
+        headers={"Access-Control-Allow-Origin": "*", "Cache-Control": "public, max-age=60"})
 app.add_middleware(SessionMiddleware, secret_key=auth.JWT_SECRET, same_site="lax")
 
 
