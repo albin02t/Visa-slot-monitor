@@ -12,8 +12,8 @@
   <script>tailwind.config = { darkMode: 'class' }</script>
   <style>
     :root{
-      --bg:#04080b; --panel:#081015; --panel-2:#0b141b; --field:#060d11;
-      --line:rgba(255,255,255,.055); --line-2:rgba(255,255,255,.1);
+      --bg:#04080b; --panel:#0a1219; --panel-2:#0e1821; --field:#071018;
+      --line:rgba(255,255,255,.085); --line-2:rgba(255,255,255,.14);
       --txt:#e6f2ec; --txt-2:#8fa89d; --txt-3:#54695f;
       --radar:#4ade80; --radar-dim:rgba(74,222,128,.14);
       --accent:#2dd4bf; --warn:#fbbf24; --err:#fb7185; --blip:#fbbf24;
@@ -27,8 +27,9 @@
     ::-webkit-scrollbar-thumb{background:#1d2b26;border-radius:4px}
     ::-webkit-scrollbar-track{background:transparent}
 
-    .card{background:var(--panel);border:1px solid var(--line);border-radius:16px}
-    .card-sm{background:var(--panel-2);border:1px solid var(--line);border-radius:13px;transition:border-color .2s,transform .2s}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,.025),transparent 45%),var(--panel);border:1px solid var(--line);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 8px 28px rgba(0,0,0,.35)}
+    .card-sm{background:linear-gradient(180deg,rgba(255,255,255,.03),transparent 50%),var(--panel-2);border:1px solid var(--line);border-radius:13px;transition:border-color .2s,transform .2s,box-shadow .2s;box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
+    .card-sm:hover{border-color:var(--line-2);transform:translateY(-1px);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 10px 26px rgba(0,0,0,.35)}
     .glassbar{background:rgba(4,8,11,.75);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
     .glow{background:radial-gradient(50% 42% at 50% -4%, rgba(74,222,128,.10) 0%, transparent 70%)}
     .scan-bg{background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
@@ -45,7 +46,7 @@
       background:linear-gradient(var(--radar-dim),var(--radar-dim)) 50% 0/1px 100% no-repeat,
                  linear-gradient(var(--radar-dim),var(--radar-dim)) 0 50%/100% 1px no-repeat}
     .sweep{position:absolute;inset:0;border-radius:50%;
-      background:conic-gradient(from 0deg, rgba(74,222,128,.35) 0deg, rgba(74,222,128,.05) 55deg, transparent 70deg);
+      background:conic-gradient(from 0deg, rgba(74,222,128,.4) 0deg, rgba(74,222,128,.18) 30deg, rgba(74,222,128,.06) 65deg, transparent 95deg);filter:blur(1px);
       animation:sweep 3.4s linear infinite}
     @keyframes sweep{to{transform:rotate(360deg)}}
     .radar.idle .sweep{animation-duration:9s;opacity:.35}
@@ -54,6 +55,8 @@
     .blip.green{background:var(--radar);box-shadow:0 0 10px var(--radar)}
     @keyframes blip{0%{transform:scale(.4);opacity:0}12%{opacity:1;transform:scale(1.25)}30%{transform:scale(1)}100%{opacity:0}}
     .radar-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;pointer-events:none}
+    .radar::after{content:'';position:absolute;inset:-1px;border-radius:50%;border:1px solid rgba(74,222,128,.35);animation:breathe 3.4s ease-in-out infinite}
+    @keyframes breathe{0%,100%{opacity:.25;transform:scale(1)}50%{opacity:.7;transform:scale(1.01)}}
 
     /* nav / sidebar */
     #sidebar{width:238px;min-width:238px;background:var(--panel);border-right:1px solid var(--line)}
@@ -120,6 +123,7 @@
     .feed{max-height:330px;overflow-y:auto}
     .feed-item{padding:13px 16px;border-bottom:1px solid var(--line)}
     .feed-item:last-child{border-bottom:none}
+    .feed-item:hover{background:rgba(255,255,255,.018)}
     .gbtn{display:inline-flex;align-items:center;gap:11px;background:#fff;color:#111;font-weight:600;
           font-size:14.5px;padding:13px 26px;border-radius:12px;cursor:pointer;border:none;font-family:inherit;
           transition:transform .14s, box-shadow .14s;box-shadow:0 1px 3px rgba(0,0,0,.5)}
@@ -304,7 +308,7 @@
     </div>
   </aside>
 
-  <main class="flex-1 overflow-y-auto">
+  <main class="flex-1 overflow-y-auto" style="background:radial-gradient(55% 30% at 50% 0%, rgba(74,222,128,.05) 0%, transparent 70%)">
 
     <!-- RADAR (dashboard) -->
     <div id="page-dashboard" class="p-7 space-y-6 max-w-6xl mx-auto">
@@ -328,33 +332,29 @@
           </div>
         </div>
         <div class="lg:col-span-3 grid grid-cols-2 gap-4">
-          <div class="card-sm p-5 flex flex-col justify-center">
-            <div class="flex items-center gap-3 mb-1">
-              <div class="chip" style="background:rgba(74,222,128,.1)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
-              <p class="stat-num" id="s-alerts">0</p>
-            </div>
-            <p class="text-[12px]" style="color:var(--txt-3)">Alerts fired</p>
+          <div class="card-sm p-5 relative">
+            <div class="chip absolute top-4 right-4" style="background:rgba(74,222,128,.1)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4ade80" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+            <p class="kicker">Alerts fired</p>
+            <p class="stat-num mt-2" id="s-alerts">0</p>
+            <p class="text-[12px] mt-1" style="color:var(--txt-3)">slot hits delivered to you</p>
           </div>
-          <div class="card-sm p-5 flex flex-col justify-center">
-            <div class="flex items-center gap-3 mb-1">
-              <div class="chip" style="background:rgba(45,212,191,.1)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg></div>
-              <p class="stat-num" id="s-cvs">0</p>
-            </div>
-            <p class="text-[12px]" style="color:var(--txt-3)">Radar sweeps (API polls)</p>
+          <div class="card-sm p-5 relative">
+            <div class="chip absolute top-4 right-4" style="background:rgba(45,212,191,.1)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg></div>
+            <p class="kicker">Radar sweeps</p>
+            <p class="stat-num mt-2" id="s-cvs">0</p>
+            <p class="text-[12px] mt-1" style="color:var(--txt-3)">checkvisaslots API polls</p>
           </div>
-          <div class="card-sm p-5 flex flex-col justify-center">
-            <div class="flex items-center gap-3 mb-1">
-              <div class="chip" style="background:rgba(168,85,247,.1)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-              <p class="stat-num" id="s-tg">0</p>
-            </div>
-            <p class="text-[12px]" style="color:var(--txt-3)">Signals analyzed</p>
+          <div class="card-sm p-5 relative">
+            <div class="chip absolute top-4 right-4" style="background:rgba(168,85,247,.1)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+            <p class="kicker">Signals analyzed</p>
+            <p class="stat-num mt-2" id="s-tg">0</p>
+            <p class="text-[12px] mt-1" style="color:var(--txt-3)">channel messages read by AI</p>
           </div>
-          <div class="card-sm p-5 flex flex-col justify-center">
-            <div class="flex items-center gap-3 mb-1">
-              <div class="chip" style="background:rgba(251,191,36,.1)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
-              <p class="stat-num" id="s-remaining">—</p>
-            </div>
-            <p class="text-[12px]" style="color:var(--txt-3)">API calls left today</p>
+          <div class="card-sm p-5 relative">
+            <div class="chip absolute top-4 right-4" style="background:rgba(251,191,36,.1)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+            <p class="kicker">Fuel left</p>
+            <p class="stat-num mt-2" id="s-remaining">—</p>
+            <p class="text-[12px] mt-1" style="color:var(--txt-3)">API calls remaining today</p>
           </div>
         </div>
       </div>
@@ -566,7 +566,7 @@ let _lastAl=0;
 const STEPS=[{title:'Briefing'},{title:'Telegram'},{title:'Alerts'},{title:'Slot data'},{title:'Launch'}];
 let curStep=0, draft={};
 const STEP_HTML=[
-`<div class="space-y-5 text-[14.5px]" style="color:var(--txt-2)"><p class="display text-[15px] font-bold" style="color:var(--txt)">Mission briefing</p><p class="text-[14px]">Your radar watches two sources in parallel and pings your Telegram the moment F1 interview slots appear.</p><div class="grid sm:grid-cols-2 gap-3"><div class="card-sm p-4"><p class="font-semibold text-[13px] mb-2" style="color:#4ade80">checkvisaslots.com API</p><p class="text-[13px]" style="color:var(--txt-3)">Polls on your interval; fires when confirmed open slots match your locations.</p></div><div class="card-sm p-4"><p class="font-semibold text-[13px] mb-2" style="color:#5eead4">Telegram channels</p><p class="text-[13px]" style="color:var(--txt-3)">AI reads each message in context and flags only present-tense "slots are open now" confirmations.</p></div></div><div class="card-sm p-4"><p class="font-semibold text-[13px] mb-2" style="color:#fbbf24">Instant Telegram alerts</p><p class="text-[13px]" style="color:var(--txt-3)">Alerts arrive from our bot — free, instant, reliable. You'll connect it in the Alerts checkpoint.</p></div><p class="text-[13px]" style="color:var(--txt-3)">Clear each checkpoint on the left — the readiness bar tracks your progress. Your settings are private to your account.</p></div>`,
+`<div class="space-y-5 text-[14.5px]" style="color:var(--txt-2)"><p class="text-[14px]">Your radar watches two sources in parallel and pings your Telegram the moment F1 interview slots appear.</p><div class="grid sm:grid-cols-2 gap-3"><div class="card-sm p-4"><p class="font-semibold text-[13px] mb-2" style="color:#4ade80">checkvisaslots.com API</p><p class="text-[13px]" style="color:var(--txt-3)">Polls on your interval; fires when confirmed open slots match your locations.</p></div><div class="card-sm p-4"><p class="font-semibold text-[13px] mb-2" style="color:#5eead4">Telegram channels</p><p class="text-[13px]" style="color:var(--txt-3)">AI reads each message in context and flags only present-tense "slots are open now" confirmations.</p></div></div><div class="card-sm p-4"><p class="font-semibold text-[13px] mb-2" style="color:#fbbf24">Instant Telegram alerts</p><p class="text-[13px]" style="color:var(--txt-3)">Alerts arrive from our bot — free, instant, reliable. You'll connect it in the Alerts checkpoint.</p></div><p class="text-[13px]" style="color:var(--txt-3)">Clear each checkpoint on the left — the readiness bar tracks your progress. Your settings are private to your account.</p></div>`,
 `<div class="space-y-5"><p class="text-[13px]" style="color:var(--txt-3)">Get credentials at <a href="https://my.telegram.org/apps" target="_blank" style="color:#4ade80;text-decoration:underline">my.telegram.org/apps</a> → create an application.</p><div class="grid sm:grid-cols-2 gap-4"><div><label class="lbl">API ID *</label><input data-key="TELEGRAM_API_ID" class="inp" placeholder="12345678"></div><div><label class="lbl">API Hash *</label><input data-key="TELEGRAM_API_HASH" class="inp" placeholder="abc123..."></div></div><div><label class="lbl">Channels to monitor *</label><input data-key="TELEGRAM_CHANNELS" class="inp" placeholder="@F1_Visa_Slots,@AnotherChannel"><p class="text-[12px] mt-1.5" style="color:var(--txt-3)">Comma-separated, include @.</p></div><hr style="border-color:var(--line)"><div><p class="text-[14.5px] font-bold mb-3 display" style="color:var(--txt)">Telegram Login</p><div id="tg-status-area"><button onclick="checkTgSession()" class="btn-ghost text-[13px]">Check session status</button></div></div></div>`,
 `<div class="space-y-5"><p class="text-[13px]" style="color:var(--txt-3)">Alerts arrive as Telegram messages from our bot — free and instant. One tap to connect:</p><div id="alerts-area" class="card-sm p-6 text-center"><p class="text-[13px]" style="color:var(--txt-3)">Checking…</p></div><ul class="card-sm p-4 text-[13px] space-y-2" style="color:var(--txt-3)"><li><span style="color:#4ade80;font-weight:700">1.</span> Click Connect — Telegram opens with our bot</li><li><span style="color:#4ade80;font-weight:700">2.</span> Press <strong style="color:var(--txt-2)">Start</strong> in the chat — that's it</li><li><span style="color:#4ade80;font-weight:700">3.</span> Every alert lands in that chat within seconds</li></ul></div>`,
 `<div class="space-y-5"><p class="text-[13px]" style="color:var(--txt-3)">Get an API key at <a href="https://checkvisaslots.com" target="_blank" style="color:#4ade80;text-decoration:underline">checkvisaslots.com</a>.</p><div><label class="lbl">CVS API Key *</label><input type="password" data-key="CVS_API_KEY" class="inp" placeholder="••••••••"></div><div><label class="lbl">Locations</label><input data-key="CVS_LOCATIONS" class="inp" placeholder="CHENNAI,NEW DELHI"><p class="text-[12px] mt-1.5" style="color:var(--txt-3)">Uppercase, comma-separated. Blank = all locations.</p></div><div class="grid sm:grid-cols-2 gap-4"><div><label class="lbl">Poll interval (seconds)</label><input type="number" data-key="CVS_POLL_INTERVAL" class="inp" placeholder="780"><p class="text-[12px] mt-1.5" style="color:var(--txt-3)">Default 780. Min 300.</p></div><div><label class="lbl">Duration window (days)</label><input type="number" data-key="CVS_DURATION_DAYS" class="inp" placeholder="120"></div></div></div>`,
@@ -575,6 +575,7 @@ function collectInputs(){document.querySelectorAll('#step-body [data-key]').forE
 function reviewHtml(){const sens=new Set(['CVS_API_KEY','TELEGRAM_API_HASH']);const e=Object.entries(draft);if(!e.length)return '<p class="text-[14.5px]" style="color:var(--txt-3)">Nothing configured yet — clear the earlier checkpoints first.</p>';return `<p class="text-[13px] mb-3" style="color:var(--txt-3)">Final check. Sensitive values are masked.</p><div class="card-sm mb-4 overflow-hidden" style="border-radius:11px">${e.map(([k,v])=>`<div class="flex items-center justify-between gap-4 px-3.5 py-2.5 border-b last:border-0" style="border-color:var(--line)"><span class="text-[12px] font-mono shrink-0" style="color:var(--txt-3)">${k}</span><span class="text-[12px] font-mono truncate" style="color:var(--txt-2)">${sens.has(k)?'•'.repeat(Math.min(v.length,16)):esc(v)}</span></div>`).join('')}</div><button id="save-btn" onclick="saveConfig()" class="btn btn-success w-full">🛰️ Save & bring radar online</button><p class="text-[12px] text-center mt-2.5" style="color:var(--txt-3)">Saved to your account · the radar starts automatically once every system below is green</p><div id="readiness" class="mt-6"></div>`;}
 
 let _wasAllReady=sessionStorage.getItem('vsm_celebrated')==='1';
+let _readyBaselined=false;
 async function checkReadiness(){
   const el=$('readiness');
   let tg={authorized:false}, st={};
@@ -589,7 +590,8 @@ async function checkReadiness(){
   ];
   const done=checks.filter(c=>c[0]).length, pct=Math.round(done/checks.length*100);
   if($('ready-pct')){$('ready-pct').textContent=pct+'%';$('ready-bar').style.width=pct+'%';}
-  if(done===checks.length&&!_wasAllReady){_wasAllReady=true;sessionStorage.setItem('vsm_celebrated','1');confetti();showToast('🛰️ All systems go — your radar is live!');}
+  if(!_readyBaselined){_readyBaselined=true;if(done===checks.length)_wasAllReady=true;}
+  else if(done===checks.length&&!_wasAllReady){_wasAllReady=true;sessionStorage.setItem('vsm_celebrated','1');confetti();showToast('🛰️ All systems go — your radar is live!');}
   if(!el) return;
   const item=(ok,label,hint)=>`<div class="flex items-start gap-3 py-2"><span class="text-[14.5px] leading-5" style="color:${ok?'#4ade80':'var(--txt-3)'}">${ok?'✓':'○'}</span><div class="flex-1"><p class="text-[13px] font-medium" style="color:var(--txt-2)">${label}</p>${!ok&&hint?`<p class="text-[12px] mt-0.5" style="color:var(--warn);opacity:.85">${hint}</p>`:''}</div></div>`;
   el.innerHTML=`<div class="card-sm p-5"><div class="flex items-center justify-between mb-2"><p class="text-[13px] font-bold display" style="color:var(--txt)">Pre-flight checks</p><span class="badge ${done===4?'badge-green':'badge-gray'}">${done}/4</span></div>
