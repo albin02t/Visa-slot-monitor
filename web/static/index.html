@@ -3,139 +3,223 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Visa Slot Monitor</title>
+  <title>Visa Slot Monitor — instant F1 visa slot alerts</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🛂</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>tailwind.config = { darkMode: 'class' }</script>
   <style>
+    :root{
+      --bg:#08080d; --panel:#0d0d15; --panel-2:#11111b; --field:#0a0a12;
+      --line:rgba(255,255,255,.06); --line-2:rgba(255,255,255,.1);
+      --txt:#e4e4ef; --txt-2:#8b8ba3; --txt-3:#565672;
+      --accent:#6366f1; --accent-2:#818cf8; --ok:#10b981; --warn:#f59e0b; --err:#f43f5e;
+    }
     *{box-sizing:border-box}
-    body{background:#070d18;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,sans-serif}
+    html{scroll-behavior:smooth}
+    body{background:var(--bg);color:var(--txt-2);font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;
+         font-feature-settings:'cv11','ss01';-webkit-font-smoothing:antialiased}
+    ::selection{background:#6366f155}
     ::-webkit-scrollbar{width:4px;height:4px}
-    ::-webkit-scrollbar-thumb{background:#2a3a52;border-radius:4px}
+    ::-webkit-scrollbar-thumb{background:#26263a;border-radius:4px}
     ::-webkit-scrollbar-track{background:transparent}
 
-    .glow{background:radial-gradient(60% 60% at 50% 0%,#1e3a8a30 0%,transparent 70%)}
-    #sidebar{width:224px;min-width:224px;background:#0b1322;border-right:1px solid #18233a}
+    /* ── surfaces ── */
+    .card{background:var(--panel);border:1px solid var(--line);border-radius:16px}
+    .card-sm{background:var(--panel-2);border:1px solid var(--line);border-radius:13px;transition:border-color .2s}
+    .glassbar{background:rgba(8,8,13,.72);backdrop-filter:blur(14px);border-bottom:1px solid var(--line)}
+    .glow{background:
+      radial-gradient(52% 44% at 50% -6%, rgba(99,102,241,.16) 0%, transparent 70%),
+      radial-gradient(30% 26% at 78% 12%, rgba(139,92,246,.08) 0%, transparent 70%)}
+    .grid-bg{background-image:linear-gradient(var(--line) 1px,transparent 1px),linear-gradient(90deg,var(--line) 1px,transparent 1px);
+             background-size:56px 56px;mask-image:radial-gradient(60% 52% at 50% 0%,#000 30%,transparent 78%)}
 
-    .nav-item{display:flex;align-items:center;gap:11px;padding:9px 13px;border-radius:9px;cursor:pointer;
-              font-size:13.5px;color:#5b6b85;transition:all .15s;margin:1px 9px}
-    .nav-item:hover{color:#9fb0cb;background:#16213705}
-    .nav-item:hover{background:#141f33}
-    .nav-item.active{color:#fff;background:linear-gradient(90deg,#1e3a8a40,#1e3a8a10);box-shadow:inset 2px 0 0 #3b82f6}
-    .nav-item.active .nv{color:#60a5fa}
+    /* ── sidebar / nav ── */
+    #sidebar{width:236px;min-width:236px;background:var(--panel);border-right:1px solid var(--line)}
+    .nav-item{display:flex;align-items:center;gap:11px;padding:9px 13px;border-radius:10px;cursor:pointer;
+              font-size:13.5px;font-weight:500;color:var(--txt-3);transition:all .16s;margin:2px 10px;border:1px solid transparent;background:none;width:calc(100% - 20px);text-align:left}
+    .nav-item:hover{color:var(--txt-2);background:rgba(255,255,255,.03)}
+    .nav-item.active{color:#fff;background:linear-gradient(135deg,rgba(99,102,241,.16),rgba(99,102,241,.05));border-color:rgba(99,102,241,.25)}
+    .nav-item.active .nv{color:var(--accent-2)}
+    .nv{color:var(--txt-3);display:inline-flex;transition:color .16s}
 
-    .card{background:#0c1626;border:1px solid #18233a;border-radius:14px}
-    .card-sm{background:#0a1322;border:1px solid #16213a;border-radius:11px}
+    /* ── status dots ── */
+    .dot{width:7px;height:7px;border-radius:50%;display:inline-block;flex-shrink:0;transition:all .3s}
+    .dot-on{background:var(--ok);box-shadow:0 0 10px rgba(16,185,129,.65)}
+    .dot-off{background:#2b2b40}
 
-    .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
-    .dot-on{background:#22c55e;box-shadow:0 0 9px #22c55e90}
-    .dot-off{background:#2a3a52}
+    /* ── forms ── */
+    .inp{width:100%;background:var(--field);border:1px solid var(--line-2);border-radius:10px;padding:10px 13px;
+         color:var(--txt);font-size:13.5px;font-family:inherit;outline:none;transition:border-color .16s, box-shadow .16s}
+    .inp:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(99,102,241,.14)}
+    .inp::placeholder{color:#3a3a52}
+    .lbl{display:block;font-size:12px;font-weight:600;color:var(--txt-2);margin-bottom:6px;letter-spacing:.01em}
 
-    .inp{width:100%;background:#070f1d;border:1px solid #1d2c47;border-radius:9px;padding:9px 12px;
-         color:#e6edf7;font-size:13px;outline:none;transition:border-color .15s}
-    .inp:focus{border-color:#3b82f6}
-    .inp::placeholder{color:#2c3c58}
-    .lbl{display:block;font-size:12px;font-weight:500;color:#6b7b96;margin-bottom:6px}
+    /* ── buttons ── */
+    .btn{border:none;border-radius:10px;font-weight:600;font-family:inherit;cursor:pointer;transition:all .16s}
+    .btn-primary{background:linear-gradient(135deg,#6366f1,#7c5cf6);color:#fff;padding:10px 20px;font-size:13.5px;
+                 box-shadow:0 1px 2px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.12)}
+    .btn-primary:hover{filter:brightness(1.12);transform:translateY(-1px);box-shadow:0 6px 20px rgba(99,102,241,.35)}
+    .btn-primary:disabled{opacity:.5;cursor:default;transform:none;filter:none}
+    .btn-success{background:linear-gradient(135deg,#0ea371,#10b981);color:#fff;padding:10px 20px;font-size:13.5px;
+                 box-shadow:0 1px 2px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.12)}
+    .btn-success:hover{filter:brightness(1.1);transform:translateY(-1px)}
+    .btn-ghost{background:transparent;color:var(--txt-2);border:1px solid var(--line-2);padding:8px 15px;font-size:12.5px;
+               font-weight:500;border-radius:10px;cursor:pointer;transition:all .16s;font-family:inherit}
+    .btn-ghost:hover{color:var(--txt);border-color:#3a3a55;background:rgba(255,255,255,.02)}
 
-    .btn{border:none;border-radius:9px;font-weight:600;cursor:pointer;transition:all .15s}
-    .btn-primary{background:#2563eb;color:#fff;padding:9px 18px;font-size:13px}
-    .btn-primary:hover{background:#3b82f6}
-    .btn-primary:disabled{opacity:.5;cursor:default}
-    .btn-success{background:#15803d;color:#fff;padding:9px 18px;font-size:13px}
-    .btn-success:hover{background:#16a34a}
-    .btn-ghost{background:transparent;color:#6b7b96;border:1px solid #1d2c47;padding:7px 14px;font-size:12px;border-radius:9px;cursor:pointer}
-    .btn-ghost:hover{color:#9fb0cb;border-color:#2c3c58}
+    /* ── badges ── */
+    .badge{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:600;letter-spacing:.01em}
+    .badge-green{background:rgba(16,185,129,.12);color:#34d399;border:1px solid rgba(16,185,129,.3)}
+    .badge-blue{background:rgba(99,102,241,.12);color:#a5b4fc;border:1px solid rgba(99,102,241,.3)}
+    .badge-gray{background:rgba(255,255,255,.04);color:var(--txt-3);border:1px solid var(--line-2)}
+    .badge-yellow{background:rgba(245,158,11,.1);color:#fbbf24;border:1px solid rgba(245,158,11,.3)}
+    .badge-red{background:rgba(244,63,94,.1);color:#fb7185;border:1px solid rgba(244,63,94,.3)}
 
-    .badge{display:inline-flex;align-items:center;padding:2px 9px;border-radius:20px;font-size:11px;font-weight:600}
-    .badge-green{background:#14532d50;color:#86efac;border:1px solid #15803d}
-    .badge-blue{background:#1e3a8a50;color:#93c5fd;border:1px solid #1e40af}
-    .badge-gray{background:#1a2742;color:#5b6b85;border:1px solid #243352}
-    .badge-yellow{background:#78350f50;color:#fcd34d;border:1px solid #92400e}
+    /* ── wizard steps ── */
+    .step-btn{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:10px;cursor:pointer;border:1px solid transparent;
+              font-size:12.5px;font-weight:500;color:var(--txt-3);transition:all .16s;width:100%;text-align:left;background:none;font-family:inherit}
+    .step-btn:hover{color:var(--txt-2)}
+    .step-btn.active{color:var(--accent-2);background:rgba(99,102,241,.09);border-color:rgba(99,102,241,.22)}
+    .step-btn.done{color:var(--txt-2)}
+    .step-num{width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+              font-size:10px;font-weight:700;border:1.5px solid #2b2b40;color:var(--txt-3);flex-shrink:0;transition:all .16s}
+    .step-btn.active .step-num{border-color:var(--accent);color:var(--accent-2);background:rgba(99,102,241,.12)}
+    .step-btn.done .step-num{background:var(--ok);border-color:var(--ok);color:#04120c}
 
-    .step-btn{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;cursor:pointer;
-              font-size:12.5px;color:#445268;transition:all .15s;width:100%;text-align:left}
-    .step-btn:hover{color:#9fb0cb}
-    .step-btn.active{color:#93c5fd;background:#1e3a8a25}
-    .step-num{width:21px;height:21px;border-radius:50%;display:flex;align-items:center;justify-content:center;
-              font-size:10px;font-weight:700;border:1px solid #243352;color:#445268;flex-shrink:0}
-    .step-btn.active .step-num{border-color:#3b82f6;color:#60a5fa;background:#1e3a8a30}
-    .step-btn.done .step-num{background:#15803d;border-color:#15803d;color:#fff}
+    /* ── logs ── */
+    #log-box{font-family:'JetBrains Mono',monospace;font-size:11.5px;line-height:1.75}
+    .l-err{color:#fb7185}.l-warn{color:#fbbf24}.l-dbg{color:#33334a}.l-info{color:#62627e}
 
-    #log-box{font-family:'JetBrains Mono','Fira Code',monospace;font-size:11.5px;line-height:1.7}
-    .l-err{color:#f87171}.l-warn{color:#fbbf24}.l-dbg{color:#2c3c58}.l-info{color:#52617a}
+    /* ── stat tiles ── */
+    .stat{position:relative;overflow:hidden}
+    .stat:hover{border-color:var(--line-2)}
+    .stat-num{font-size:1.65rem;font-weight:700;letter-spacing:-.02em;color:var(--txt)}
+    .chip{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 
-    .fade-in{animation:fi .2s ease}@keyframes fi{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
-    #toast{transition:opacity .2s,transform .2s}#toast.hide{opacity:0;transform:translateY(8px);pointer-events:none}
-    .feed{max-height:340px;overflow-y:auto}
-    .feed-item{padding:12px 16px;border-bottom:1px solid #16213a60}
+    /* ── misc ── */
+    .fade-in{animation:fi .25s ease}
+    @keyframes fi{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+    #toast{transition:opacity .2s,transform .2s}
+    #toast.hide{opacity:0;transform:translateY(10px);pointer-events:none}
+    .feed{max-height:352px;overflow-y:auto}
+    .feed-item{padding:13px 16px;border-bottom:1px solid var(--line)}
     .feed-item:last-child{border-bottom:none}
-    .gbtn{display:inline-flex;align-items:center;gap:10px;background:#fff;color:#1f2937;font-weight:600;
-          font-size:14px;padding:11px 22px;border-radius:11px;cursor:pointer;transition:transform .12s,box-shadow .12s;border:none}
-    .gbtn:hover{transform:translateY(-1px);box-shadow:0 8px 24px #0006}
+    .gbtn{display:inline-flex;align-items:center;gap:11px;background:#fff;color:#18181b;font-weight:600;
+          font-size:14.5px;padding:13px 26px;border-radius:12px;cursor:pointer;border:none;font-family:inherit;
+          transition:transform .14s, box-shadow .14s;box-shadow:0 1px 3px rgba(0,0,0,.5)}
+    .gbtn:hover{transform:translateY(-2px);box-shadow:0 12px 32px rgba(0,0,0,.5)}
+    .h-display{font-weight:800;letter-spacing:-.035em;line-height:1.04}
+    .grad-text{background:linear-gradient(100deg,#a5b4fc 0%,#c4b5fd 50%,#f0abfc 100%);-webkit-background-clip:text;background-clip:text;color:transparent}
+    .tick{color:var(--ok);font-weight:700}
+    .page-head{font-size:1.15rem;font-weight:700;letter-spacing:-.015em;color:var(--txt)}
+    .feature-ico{width:38px;height:38px;border-radius:11px;display:flex;align-items:center;justify-content:center;margin-bottom:12px}
   </style>
 </head>
-<body class="text-slate-300">
+<body>
 
-<!-- ═══════════════════  LANDING / LOGIN  ═══════════════════ -->
-<div id="landing" class="hidden fixed inset-0 z-50 overflow-y-auto glow" style="background:#070d18">
-  <div class="min-h-full flex flex-col">
-    <!-- top bar -->
-    <div class="flex items-center justify-between px-6 py-5 max-w-6xl mx-auto w-full">
-      <div class="flex items-center gap-2.5">
-        <span class="text-2xl">🛂</span>
-        <span class="font-bold text-white">Visa Slot Monitor</span>
-        <span class="text-[10px] text-slate-600 border border-slate-800 rounded-full px-2 py-0.5 ml-1">by Toule Labs</span>
+<!-- ═══════════════════  LANDING  ═══════════════════ -->
+<div id="landing" class="hidden fixed inset-0 z-50 overflow-y-auto glow" style="background:var(--bg)">
+  <div class="grid-bg absolute inset-x-0 top-0 h-[560px] pointer-events-none"></div>
+  <div class="min-h-full flex flex-col relative">
+
+    <!-- nav -->
+    <div class="glassbar sticky top-0 z-10">
+      <div class="flex items-center justify-between px-6 py-3.5 max-w-6xl mx-auto w-full">
+        <div class="flex items-center gap-2.5">
+          <span class="text-xl">🛂</span>
+          <span class="font-bold text-[15px]" style="color:var(--txt)">Visa Slot Monitor</span>
+          <span class="text-[10px] px-2 py-0.5 rounded-full border" style="color:var(--txt-3);border-color:var(--line-2)">by Toule Labs</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <a href="#how" class="btn-ghost hidden sm:inline-block" style="text-decoration:none">How it works</a>
+          <button onclick="location.href='/api/auth/login'" class="btn btn-primary" style="padding:8px 16px;font-size:12.5px">Sign in</button>
+        </div>
       </div>
-      <button onclick="location.href='/api/auth/login'" class="btn-ghost text-xs">Sign in</button>
     </div>
 
     <!-- hero -->
-    <div class="flex-1 flex items-center justify-center px-6 py-10">
-      <div class="max-w-2xl text-center">
-        <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-950/50 border border-blue-900/60 text-blue-300 text-xs font-medium mb-7">
-          <span class="dot dot-on"></span> Real-time F1 visa slot detection
+    <div class="flex-1 flex items-start justify-center px-6 pt-20 pb-14">
+      <div class="max-w-3xl text-center">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-medium mb-8 fade-in"
+             style="background:rgba(99,102,241,.08);border:1px solid rgba(99,102,241,.25);color:#a5b4fc">
+          <span class="dot dot-on"></span> Watching slots 24/7 — so you don't have to
         </div>
-        <h1 class="text-4xl sm:text-5xl font-extrabold text-white leading-tight tracking-tight">
-          Never miss a<br><span class="text-transparent bg-clip-text" style="background-image:linear-gradient(90deg,#60a5fa,#a78bfa)">visa interview slot</span> again
+        <h1 class="h-display text-5xl sm:text-6xl" style="color:var(--txt)">
+          Never miss a<br><span class="grad-text">visa interview slot</span> again
         </h1>
-        <p class="text-slate-400 mt-5 text-base sm:text-lg max-w-xl mx-auto">
-          Monitors checkvisaslots.com and Telegram channels around the clock, and pings you on Telegram the instant slots open.
+        <p class="mt-6 text-base sm:text-lg max-w-xl mx-auto" style="color:var(--txt-2)">
+          Monitors checkvisaslots.com and Telegram channels around the clock, filters the noise with AI,
+          and pings you on Telegram the instant F1 slots open.
         </p>
 
-        <div class="mt-9 flex flex-col items-center gap-3">
+        <div class="mt-10 flex flex-col items-center gap-4">
           <button id="google-btn" onclick="location.href='/api/auth/login'" class="gbtn">
-            <svg width="18" height="18" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
+            <svg width="19" height="19" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>
             Continue with Google
           </button>
+          <p class="text-xs" style="color:var(--txt-3)">Free · 5-minute setup · alerts via Telegram</p>
           <button id="dev-btn" onclick="devLogin()" class="hidden btn-ghost">Dev login (local)</button>
-          <p id="no-auth-msg" class="hidden text-amber-400 text-xs mt-2 max-w-sm">
+          <p id="no-auth-msg" class="hidden text-xs mt-1 max-w-sm" style="color:var(--warn)">
             Google OAuth isn't configured. Set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET, or enable ALLOW_DEV_LOGIN=1 for local testing.
           </p>
-          <p id="login-err" class="hidden text-red-400 text-xs mt-2"></p>
+          <p id="login-err" class="hidden text-xs mt-1" style="color:var(--err)"></p>
         </div>
 
-        <!-- feature row -->
-        <div class="grid sm:grid-cols-3 gap-3 mt-14 text-left">
-          <div class="card-sm p-4"><p class="text-green-400 text-sm font-semibold mb-1">🌐 API polling</p><p class="text-xs text-slate-500">Confirmed open slots from checkvisaslots.com on your schedule.</p></div>
-          <div class="card-sm p-4"><p class="text-blue-400 text-sm font-semibold mb-1">💬 AI Telegram filter</p><p class="text-xs text-slate-500">AI reads channel chatter in context and flags only real "slots open now" messages.</p></div>
-          <div class="card-sm p-4"><p class="text-yellow-400 text-sm font-semibold mb-1">🔔 Instant Telegram alerts</p><p class="text-xs text-slate-500">One tap to connect our bot — alerts arrive in seconds, free forever.</p></div>
+        <!-- sample alert preview -->
+        <div class="mt-14 mx-auto max-w-sm text-left fade-in">
+          <div class="card p-4" style="box-shadow:0 24px 60px rgba(0,0,0,.5)">
+            <div class="flex items-center gap-2.5 mb-3">
+              <div class="chip" style="background:linear-gradient(135deg,#2AABEE,#229ED9)"><svg width="17" height="17" viewBox="0 0 24 24" fill="#fff"><path d="M9.04 15.5l-.38 4.03c.54 0 .78-.24 1.07-.52l2.57-2.45 5.33 3.9c.98.54 1.68.26 1.93-.9L23.9 4.8c.32-1.44-.52-2-1.46-1.65L2.5 10.83c-1.4.54-1.38 1.32-.24 1.67l5.1 1.59L19.2 6.63c.56-.37 1.07-.16.65.2L9.04 15.5z"/></svg></div>
+              <div><p class="text-[13px] font-semibold" style="color:var(--txt)">Toule Slot Alerts</p><p class="text-[10.5px]" style="color:var(--txt-3)">bot · just now</p></div>
+            </div>
+            <p class="text-[13px] leading-relaxed" style="color:var(--txt-2)">🟢 <strong style="color:var(--txt)">Visa Slot Confirmed</strong><br>• CHENNAI: 3 slot(s) from 15 Jun<br><span style="color:var(--accent-2)">Book now ↗</span></p>
+          </div>
+        </div>
+
+        <!-- features -->
+        <div class="grid sm:grid-cols-3 gap-4 mt-16 text-left">
+          <div class="card-sm p-5">
+            <div class="feature-ico" style="background:rgba(16,185,129,.1)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
+            <p class="text-sm font-semibold mb-1.5" style="color:var(--txt)">Confirmed API data</p>
+            <p class="text-xs leading-relaxed" style="color:var(--txt-3)">Polls checkvisaslots.com on your schedule and alerts only for locations you care about.</p>
+          </div>
+          <div class="card-sm p-5">
+            <div class="feature-ico" style="background:rgba(99,102,241,.1)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4c0 1.95-.76 3.54-1.89 4.48A6 6 0 0 1 18 16v1H6v-1a6 6 0 0 1 3.89-5.52A5.52 5.52 0 0 1 8 6a4 4 0 0 1 4-4z"/><path d="M4 21h16"/></svg></div>
+            <p class="text-sm font-semibold mb-1.5" style="color:var(--txt)">AI noise filter</p>
+            <p class="text-xs leading-relaxed" style="color:var(--txt-3)">Reads Telegram channel chatter in context and flags only real "slots open now" messages.</p>
+          </div>
+          <div class="card-sm p-5">
+            <div class="feature-ico" style="background:rgba(245,158,11,.1)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+            <p class="text-sm font-semibold mb-1.5" style="color:var(--txt)">Instant Telegram alerts</p>
+            <p class="text-xs leading-relaxed" style="color:var(--txt-3)">One tap to connect the bot. Alerts arrive in seconds — free forever, no expiry.</p>
+          </div>
         </div>
 
         <!-- how it works -->
-        <div class="mt-14 text-left">
-          <p class="text-center text-[11px] uppercase tracking-widest text-slate-600 font-bold mb-5">Up and running in 5 minutes</p>
-          <div class="grid sm:grid-cols-4 gap-3">
-            <div class="card-sm p-4"><p class="text-slate-600 text-xs font-bold mb-1">1</p><p class="text-xs text-slate-400"><strong class="text-slate-200">Sign in</strong> with your Google account.</p></div>
-            <div class="card-sm p-4"><p class="text-slate-600 text-xs font-bold mb-1">2</p><p class="text-xs text-slate-400"><strong class="text-slate-200">Link Telegram</strong> — guided wizard, OTP right in the browser.</p></div>
-            <div class="card-sm p-4"><p class="text-slate-600 text-xs font-bold mb-1">3</p><p class="text-xs text-slate-400"><strong class="text-slate-200">Connect the bot</strong> — one tap, press Start.</p></div>
-            <div class="card-sm p-4"><p class="text-slate-600 text-xs font-bold mb-1">4</p><p class="text-xs text-slate-400"><strong class="text-slate-200">Relax</strong> — your monitor runs 24/7 and pings you first.</p></div>
+        <div class="mt-20 text-left" id="how">
+          <p class="text-center text-[11px] uppercase tracking-[.18em] font-bold mb-6" style="color:var(--txt-3)">Up and running in 5 minutes</p>
+          <div class="grid sm:grid-cols-4 gap-4">
+            <div class="card-sm p-5"><p class="text-[11px] font-bold mb-2" style="color:var(--accent-2)">01</p><p class="text-xs leading-relaxed" style="color:var(--txt-3)"><strong style="color:var(--txt)">Sign in</strong><br>with your Google account.</p></div>
+            <div class="card-sm p-5"><p class="text-[11px] font-bold mb-2" style="color:var(--accent-2)">02</p><p class="text-xs leading-relaxed" style="color:var(--txt-3)"><strong style="color:var(--txt)">Link Telegram</strong><br>guided wizard, OTP right in the browser.</p></div>
+            <div class="card-sm p-5"><p class="text-[11px] font-bold mb-2" style="color:var(--accent-2)">03</p><p class="text-xs leading-relaxed" style="color:var(--txt-3)"><strong style="color:var(--txt)">Connect the bot</strong><br>one tap, press Start.</p></div>
+            <div class="card-sm p-5"><p class="text-[11px] font-bold mb-2" style="color:var(--accent-2)">04</p><p class="text-xs leading-relaxed" style="color:var(--txt-3)"><strong style="color:var(--txt)">Relax</strong><br>your monitor runs 24/7 and pings you first.</p></div>
           </div>
         </div>
       </div>
     </div>
-    <div class="text-center text-slate-700 text-xs pb-6 space-x-3">
-      <span>© Toule Labs</span><span>·</span>
-      <a href="/terms.html" class="hover:text-slate-500">Terms</a><span>·</span>
-      <a href="/privacy.html" class="hover:text-slate-500">Privacy</a>
+
+    <!-- footer -->
+    <div class="border-t" style="border-color:var(--line)">
+      <div class="max-w-6xl mx-auto px-6 py-6 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs" style="color:var(--txt-3)">
+        <span>© Toule Labs</span>
+        <div class="space-x-5">
+          <a href="/terms.html" class="hover:underline" style="color:var(--txt-3)">Terms</a>
+          <a href="/privacy.html" class="hover:underline" style="color:var(--txt-3)">Privacy</a>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -145,38 +229,53 @@
 
   <!-- SIDEBAR -->
   <aside id="sidebar" class="flex flex-col h-full overflow-hidden">
-    <div class="px-4 py-5 border-b border-slate-800/50">
+    <div class="px-5 py-5">
       <div class="flex items-center gap-2.5">
         <span class="text-xl">🛂</span>
-        <div><p class="text-sm font-bold text-white leading-tight">Visa Slot</p>
-             <p class="text-xs text-slate-600 leading-tight">Monitor</p></div>
+        <div>
+          <p class="text-[13.5px] font-bold leading-tight" style="color:var(--txt)">Visa Slot Monitor</p>
+          <p class="text-[10px] leading-tight" style="color:var(--txt-3)">Toule Labs</p>
+        </div>
       </div>
     </div>
 
-    <!-- service status (read-only — processes are managed automatically) -->
-    <div class="px-3 py-3 border-b border-slate-800/50 space-y-2">
-      <p class="text-[10px] text-slate-600 uppercase tracking-widest font-bold px-2">Status</p>
-      <div class="flex items-center gap-2 px-2"><span id="sdot-monitor" class="dot dot-off"></span><span class="text-xs text-slate-500">Monitor</span><span id="mon-txt" class="text-[10px] text-slate-700 ml-auto">idle</span></div>
-      <div class="flex items-center gap-2 px-2"><span id="sdot-alerts" class="dot dot-off"></span><span class="text-xs text-slate-500">Alerts</span><span id="alerts-txt" class="text-[10px] text-slate-700 ml-auto">not linked</span></div>
-      <div class="flex items-center gap-2 px-2"><span id="sdot-ollama" class="dot dot-off"></span><span class="text-xs text-slate-500">AI engine</span><span id="ollama-txt" class="text-[10px] text-slate-700 ml-auto">—</span></div>
-    </div>
-
     <!-- nav -->
-    <nav class="flex-1 py-3 overflow-y-auto">
-      <button class="nav-item active" data-page="dashboard" onclick="gotoPage('dashboard')"><span class="nv text-base">⬛</span> Dashboard</button>
-      <button class="nav-item" data-page="setup" onclick="gotoPage('setup')"><span class="nv text-base">⚙️</span> Setup</button>
-      <button class="nav-item" data-page="logs" onclick="gotoPage('logs')"><span class="nv text-base">📋</span> Live Logs</button>
+    <nav class="pb-3">
+      <button class="nav-item active" data-page="dashboard" onclick="gotoPage('dashboard')">
+        <span class="nv"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span>
+        Dashboard
+      </button>
+      <button class="nav-item" data-page="setup" onclick="gotoPage('setup')">
+        <span class="nv"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></span>
+        Setup
+      </button>
+      <button class="nav-item" data-page="logs" onclick="gotoPage('logs')">
+        <span class="nv"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg></span>
+        Live Logs
+      </button>
     </nav>
 
+    <!-- status -->
+    <div class="mx-4 mt-1 card-sm p-3.5 space-y-2.5">
+      <p class="text-[10px] uppercase tracking-[.14em] font-bold" style="color:var(--txt-3)">System status</p>
+      <div class="flex items-center gap-2.5"><span id="sdot-monitor" class="dot dot-off"></span><span class="text-xs" style="color:var(--txt-2)">Monitor</span><span id="mon-txt" class="text-[10px] ml-auto" style="color:var(--txt-3)">idle</span></div>
+      <div class="flex items-center gap-2.5"><span id="sdot-alerts" class="dot dot-off"></span><span class="text-xs" style="color:var(--txt-2)">Alerts</span><span id="alerts-txt" class="text-[10px] ml-auto" style="color:var(--txt-3)">not linked</span></div>
+      <div class="flex items-center gap-2.5"><span id="sdot-ollama" class="dot dot-off"></span><span class="text-xs" style="color:var(--txt-2)">AI engine</span><span id="ollama-txt" class="text-[10px] ml-auto" style="color:var(--txt-3)">—</span></div>
+    </div>
+
+    <div class="flex-1"></div>
+
     <!-- user -->
-    <div class="px-3 py-3 border-t border-slate-800/50">
+    <div class="px-4 py-4 border-t" style="border-color:var(--line)">
       <div class="flex items-center gap-2.5 px-1">
-        <img id="user-avatar" class="w-7 h-7 rounded-full bg-slate-700" alt="">
+        <img id="user-avatar" class="w-8 h-8 rounded-full" style="background:var(--panel-2)" alt="">
         <div class="min-w-0 flex-1">
-          <p id="user-name" class="text-xs font-medium text-slate-300 truncate">—</p>
-          <p id="user-email" class="text-[10px] text-slate-600 truncate">—</p>
+          <p id="user-name" class="text-xs font-semibold truncate" style="color:var(--txt)">—</p>
+          <p id="user-email" class="text-[10px] truncate" style="color:var(--txt-3)">—</p>
         </div>
-        <button onclick="logout()" title="Sign out" class="text-slate-600 hover:text-slate-300 text-xs">⏻</button>
+        <button onclick="logout()" title="Sign out" class="btn-ghost" style="padding:5px 8px">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        </button>
       </div>
     </div>
   </aside>
@@ -185,40 +284,86 @@
   <main class="flex-1 overflow-y-auto">
 
     <!-- DASHBOARD -->
-    <div id="page-dashboard" class="p-6 space-y-5">
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <div class="card-sm p-4"><p class="text-2xl font-bold text-green-400" id="s-alerts">—</p><p class="text-xs text-slate-600 mt-0.5">Alerts sent</p></div>
-        <div class="card-sm p-4"><p class="text-2xl font-bold text-blue-400" id="s-cvs">—</p><p class="text-xs text-slate-600 mt-0.5">CVS polls</p></div>
-        <div class="card-sm p-4"><p class="text-2xl font-bold text-purple-400" id="s-tg">—</p><p class="text-xs text-slate-600 mt-0.5">TG messages</p></div>
-        <div class="card-sm p-4"><p class="text-2xl font-bold text-yellow-400" id="s-remaining">—</p><p class="text-xs text-slate-600 mt-0.5">CVS API calls left</p></div>
+    <div id="page-dashboard" class="p-7 space-y-6 max-w-6xl mx-auto">
+      <div>
+        <h1 class="page-head">Dashboard</h1>
+        <p class="text-xs mt-0.5" style="color:var(--txt-3)">Live view of your monitor, alerts, and sources</p>
       </div>
+
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="card-sm stat p-4 flex items-center gap-3.5">
+          <div class="chip" style="background:rgba(16,185,129,.1)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+          <div><p class="stat-num" id="s-alerts">—</p><p class="text-[11px]" style="color:var(--txt-3)">Alerts sent</p></div>
+        </div>
+        <div class="card-sm stat p-4 flex items-center gap-3.5">
+          <div class="chip" style="background:rgba(99,102,241,.1)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20"/></svg></div>
+          <div><p class="stat-num" id="s-cvs">—</p><p class="text-[11px]" style="color:var(--txt-3)">API polls</p></div>
+        </div>
+        <div class="card-sm stat p-4 flex items-center gap-3.5">
+          <div class="chip" style="background:rgba(168,85,247,.1)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+          <div><p class="stat-num" id="s-tg">—</p><p class="text-[11px]" style="color:var(--txt-3)">Channel messages</p></div>
+        </div>
+        <div class="card-sm stat p-4 flex items-center gap-3.5">
+          <div class="chip" style="background:rgba(245,158,11,.1)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+          <div><p class="stat-num" id="s-remaining">—</p><p class="text-[11px]" style="color:var(--txt-3)">API calls left</p></div>
+        </div>
+      </div>
+
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div class="card flex flex-col"><div class="px-4 py-3 border-b border-slate-800/50 flex items-center gap-2"><span>🔔</span><h2 class="text-sm font-semibold text-white">Alerts</h2></div><div id="feed-alerts" class="feed flex-1"><div class="feed-item text-center py-10 text-slate-700 text-xs">No alerts yet</div></div></div>
-        <div class="card flex flex-col"><div class="px-4 py-3 border-b border-slate-800/50 flex items-center gap-2"><span>🌐</span><h2 class="text-sm font-semibold text-white">checkvisaslots.com</h2></div><div id="feed-cvs" class="feed flex-1"><div class="feed-item text-center py-10 text-slate-700 text-xs">No checks yet</div></div></div>
-        <div class="card flex flex-col"><div class="px-4 py-3 border-b border-slate-800/50 flex items-center gap-2"><span>💬</span><h2 class="text-sm font-semibold text-white">Telegram</h2></div><div id="feed-tg" class="feed flex-1"><div class="feed-item text-center py-10 text-slate-700 text-xs">No messages yet</div></div></div>
+        <div class="card flex flex-col overflow-hidden">
+          <div class="px-4 py-3 border-b flex items-center gap-2" style="border-color:var(--line)">
+            <h2 class="text-[13px] font-semibold" style="color:var(--txt)">Alerts</h2>
+          </div>
+          <div id="feed-alerts" class="feed flex-1"><div class="feed-item text-center py-10 text-xs" style="color:var(--txt-3)">No alerts yet</div></div>
+        </div>
+        <div class="card flex flex-col overflow-hidden">
+          <div class="px-4 py-3 border-b flex items-center gap-2" style="border-color:var(--line)">
+            <h2 class="text-[13px] font-semibold" style="color:var(--txt)">checkvisaslots.com</h2>
+          </div>
+          <div id="feed-cvs" class="feed flex-1"><div class="feed-item text-center py-10 text-xs" style="color:var(--txt-3)">No checks yet</div></div>
+        </div>
+        <div class="card flex flex-col overflow-hidden">
+          <div class="px-4 py-3 border-b flex items-center gap-2" style="border-color:var(--line)">
+            <h2 class="text-[13px] font-semibold" style="color:var(--txt)">Telegram activity</h2>
+          </div>
+          <div id="feed-tg" class="feed flex-1"><div class="feed-item text-center py-10 text-xs" style="color:var(--txt-3)">No messages yet</div></div>
+        </div>
       </div>
     </div>
 
     <!-- SETUP -->
-    <div id="page-setup" class="hidden p-6">
+    <div id="page-setup" class="hidden p-7 max-w-6xl mx-auto">
+      <div class="mb-6">
+        <h1 class="page-head">Setup</h1>
+        <p class="text-xs mt-0.5" style="color:var(--txt-3)">Configure your sources and alerts — everything saves to your account</p>
+      </div>
       <div class="flex gap-5">
-        <div class="w-44 shrink-0"><div class="card-sm p-3 sticky top-6"><p class="text-[10px] text-slate-600 uppercase tracking-widest font-bold px-1 mb-2">Steps</p><div id="step-nav" class="space-y-0.5"></div></div></div>
-        <div class="flex-1 card p-6 min-h-[480px]" id="step-body"></div>
+        <div class="w-48 shrink-0">
+          <div class="card-sm p-3 sticky top-7">
+            <p class="text-[10px] uppercase tracking-[.14em] font-bold px-1.5 mb-2" style="color:var(--txt-3)">Steps</p>
+            <div id="step-nav" class="space-y-1"></div>
+          </div>
+        </div>
+        <div class="flex-1 card p-7 min-h-[480px]" id="step-body"></div>
       </div>
     </div>
 
     <!-- LOGS -->
-    <div id="page-logs" class="hidden p-6">
+    <div id="page-logs" class="hidden p-7 max-w-6xl mx-auto">
+      <div class="mb-6">
+        <h1 class="page-head">Live Logs</h1>
+        <p class="text-xs mt-0.5" style="color:var(--txt-3)">Real-time output from your monitor process</p>
+      </div>
       <div class="card overflow-hidden">
-        <div class="px-4 py-3 border-b border-slate-800/50 flex flex-wrap items-center gap-3 justify-between">
-          <h2 class="text-sm font-semibold text-white">Live Process Logs</h2>
+        <div class="px-4 py-3 border-b flex flex-wrap items-center gap-3 justify-between" style="border-color:var(--line)">
+          <div class="flex items-center gap-2"><span class="dot dot-on"></span><span class="text-xs font-medium" style="color:var(--txt-2)">streaming</span></div>
           <div class="flex items-center gap-3">
-            <label class="flex items-center gap-1.5 text-xs text-slate-500 cursor-pointer"><input type="checkbox" id="chk-scroll" checked class="accent-blue-500"> Auto-scroll</label>
-            <select id="log-filter" onchange="renderLogs()" class="bg-slate-900 border border-slate-700 text-slate-400 text-xs rounded-lg px-2 py-1"><option value="all">All</option><option value="monitor">Monitor</option></select>
-            <button onclick="logLines=[];renderLogs()" class="btn-ghost text-[11px] px-2 py-1">Clear</button>
+            <label class="flex items-center gap-1.5 text-xs cursor-pointer" style="color:var(--txt-3)"><input type="checkbox" id="chk-scroll" checked class="accent-indigo-500"> Auto-scroll</label>
+            <select id="log-filter" onchange="renderLogs()" class="inp" style="width:auto;padding:5px 10px;font-size:11.5px"><option value="all">All</option><option value="monitor">Monitor</option></select>
+            <button onclick="logLines=[];renderLogs()" class="btn-ghost" style="padding:5px 12px;font-size:11px">Clear</button>
           </div>
         </div>
-        <div id="log-box" class="overflow-y-auto p-4 space-y-px" style="height:calc(100vh - 200px)"><span class="text-slate-700 text-xs">Connecting to log stream…</span></div>
+        <div id="log-box" class="overflow-y-auto p-4 space-y-px" style="height:calc(100vh - 264px)"><span class="text-xs" style="color:var(--txt-3)">Connecting to log stream…</span></div>
       </div>
     </div>
 
@@ -240,7 +385,7 @@ async function api(url, opts = {}) {
 }
 const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 const fmtTs = iso => iso ? new Date(iso.endsWith('Z')||iso.includes('+')?iso:iso+'Z').toLocaleString('en-IN',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit',hour12:false}) : '—';
-function showToast(msg, err=false){const t=$('toast');t.textContent=msg;t.className=`fixed bottom-5 right-5 text-sm px-4 py-2.5 rounded-xl shadow-2xl border z-50 ${err?'bg-red-950 border-red-800 text-red-300':'bg-slate-800 border-slate-700 text-slate-200'}`;t.classList.remove('hide');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.add('hide'),3200);}
+function showToast(msg, err=false){const t=$('toast');t.textContent=msg;t.className=`fixed bottom-5 right-5 text-sm px-4 py-2.5 rounded-xl shadow-2xl border z-50 ${err?'bg-red-950 border-red-800 text-red-300':'bg-zinc-900 border-zinc-700 text-zinc-200'}`;t.classList.remove('hide');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.add('hide'),3200);}
 
 // ── Auth ──
 function showLanding(){$('landing').classList.remove('hidden');$('app').classList.add('hidden');}
@@ -263,7 +408,7 @@ function applyUser(me){
   $('user-name').textContent = me.name || 'User';
   $('user-email').textContent = me.email || '';
   if(me.picture) $('user-avatar').src = me.picture;
-  else $('user-avatar').src = 'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%2360a5fa"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>`);
+  else $('user-avatar').src = 'data:image/svg+xml,'+encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23818cf8"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>`);
 }
 
 async function devLogin(){ try{ await api('/api/auth/dev-login',{method:'POST'}); location.reload(); }catch(e){ showToast(e.message,true); } }
@@ -284,33 +429,33 @@ async function refreshDash(){
     $('ollama-txt').textContent=st.llm?'ready':'no API key';
     $('s-alerts').textContent=al.length;$('s-cvs').textContent=cvs.length;$('s-tg').textContent=tg.length;
     $('s-remaining').textContent=cvs.find(c=>c.api_remaining)?.api_remaining??'—';
-    $('feed-alerts').innerHTML=al.length?al.map(a=>`<div class="feed-item fade-in"><div class="flex items-center justify-between mb-1"><span class="badge ${a.source==='api'?'badge-green':'badge-blue'}">${a.source==='api'?'API':'Telegram'}</span><span class="text-[11px] text-slate-600">${fmtTs(a.ts)}</span></div><p class="text-xs text-slate-400">Alert delivered to your Telegram</p></div>`).join(''):'<div class="feed-item text-center py-10 text-slate-700 text-xs">No alerts yet</div>';
-    $('feed-cvs').innerHTML=cvs.length?cvs.map(c=>{const ic={slots_found:'🟢',error:'🔴',already_alerted:'🟡',no_slots:'⚫',checked:'⚫'},lb={slots_found:'Slots found!',error:'Poll error',already_alerted:'Already alerted',no_slots:'No slots',checked:'Checked'};const d=c.status==='slots_found'&&c.detail?`<p class="text-xs text-green-400 mt-1 font-mono whitespace-pre-wrap leading-relaxed">${esc(c.detail.split('\n').slice(1).join('\n'))}</p>`:'';return `<div class="feed-item fade-in"><div class="flex items-center justify-between"><span class="text-xs">${ic[c.status]||'⚫'} <span class="text-slate-300">${lb[c.status]||c.status}</span></span><span class="text-[11px] text-slate-600">${fmtTs(c.ts)}</span></div>${d}</div>`;}).join(''):'<div class="feed-item text-center py-10 text-slate-700 text-xs">No checks yet</div>';
-    $('feed-tg').innerHTML=tg.length?tg.map(e=>{const vb=e.verdict==='YES'?'badge-green':(e.verdict==='NO'||e.verdict==='SKIPPED')?'badge-gray':e.verdict==='ERROR'?'badge-red':'badge-yellow';return `<div class="feed-item fade-in"><div class="flex items-center justify-between mb-1"><span class="text-xs text-slate-400 font-medium truncate max-w-[120px]">${esc(e.channel||'?')}</span><span class="badge ${vb}">${e.verdict||'pending'}</span></div><p class="text-xs text-slate-500 line-clamp-2">${esc(e.preview||'')}</p><p class="text-[11px] text-slate-700 mt-1">${fmtTs(e.ts)}</p></div>`;}).join(''):'<div class="feed-item text-center py-10 text-slate-700 text-xs">No messages yet</div>';
+    $('feed-alerts').innerHTML=al.length?al.map(a=>`<div class="feed-item fade-in"><div class="flex items-center justify-between mb-1"><span class="badge ${a.source==='api'?'badge-green':'badge-blue'}">${a.source==='api'?'API':'Telegram'}</span><span class="text-[11px]" style="color:var(--txt-3)">${fmtTs(a.ts)}</span></div><p class="text-xs" style="color:var(--txt-2)">Alert delivered to your Telegram</p></div>`).join(''):'<div class="feed-item text-center py-10 text-xs" style="color:var(--txt-3)">No alerts yet</div>';
+    $('feed-cvs').innerHTML=cvs.length?cvs.map(c=>{const ic={slots_found:'🟢',error:'🔴',already_alerted:'🟡',no_slots:'⚪',checked:'⚪'},lb={slots_found:'Slots found!',error:'Poll error',already_alerted:'Already alerted',no_slots:'No slots',checked:'Checked'};const d=c.status==='slots_found'&&c.detail?`<p class="text-xs mt-1 font-mono whitespace-pre-wrap leading-relaxed" style="color:#34d399">${esc(c.detail.split('\n').slice(1).join('\n'))}</p>`:'';return `<div class="feed-item fade-in"><div class="flex items-center justify-between"><span class="text-xs">${ic[c.status]||'⚪'} <span style="color:var(--txt-2)">${lb[c.status]||c.status}</span></span><span class="text-[11px]" style="color:var(--txt-3)">${fmtTs(c.ts)}</span></div>${d}</div>`;}).join(''):'<div class="feed-item text-center py-10 text-xs" style="color:var(--txt-3)">No checks yet</div>';
+    $('feed-tg').innerHTML=tg.length?tg.map(e=>{const vb=e.verdict==='YES'?'badge-green':(e.verdict==='NO'||e.verdict==='SKIPPED')?'badge-gray':e.verdict==='ERROR'?'badge-red':'badge-yellow';return `<div class="feed-item fade-in"><div class="flex items-center justify-between mb-1"><span class="text-xs font-medium truncate max-w-[130px]" style="color:var(--txt-2)">${esc(e.channel||'?')}</span><span class="badge ${vb}">${e.verdict||'pending'}</span></div><p class="text-xs line-clamp-2" style="color:var(--txt-3)">${esc(e.preview||'')}</p><p class="text-[11px] mt-1" style="color:var(--txt-3);opacity:.7">${fmtTs(e.ts)}</p></div>`;}).join(''):'<div class="feed-item text-center py-10 text-xs" style="color:var(--txt-3)">No messages yet</div>';
   }catch{}
 }
 
 // ── Setup wizard ──
-const STEPS=[{title:'Overview',icon:'🛂'},{title:'Telegram',icon:'✈️'},{title:'Alerts',icon:'🔔'},{title:'checkvisaslots.com',icon:'🌐'},{title:'Save & Launch',icon:'✅'}];
+const STEPS=[{title:'Overview'},{title:'Telegram'},{title:'Alerts'},{title:'Slot data'},{title:'Save & Launch'}];
 let curStep=0, draft={};
 const STEP_HTML=[
-`<div class="space-y-4 text-sm text-slate-400"><p class="text-base font-semibold text-white">How it works</p><p>Visa Slot Monitor watches two sources in parallel and sends you a Telegram alert the moment F1 interview slots appear.</p><div class="grid sm:grid-cols-2 gap-3"><div class="card-sm p-4"><p class="text-green-400 font-semibold text-xs mb-2">🌐 checkvisaslots.com API</p><p class="text-xs">Polls on your interval; fires when confirmed open slots match your locations.</p></div><div class="card-sm p-4"><p class="text-blue-400 font-semibold text-xs mb-2">💬 Telegram channels</p><p class="text-xs">A local AI reads each message in context and flags only present-tense "slots are open now" confirmations.</p></div></div><div class="card-sm p-4"><p class="text-yellow-400 font-semibold text-xs mb-2">🔔 Instant Telegram alerts</p><p class="text-xs">Alerts arrive as a Telegram message from our bot — free, instant, and reliable. You'll connect it in the Alerts step.</p></div><p class="text-slate-600 text-xs">Configure each step on the left. Your settings are private to your account.</p></div>`,
-`<div class="space-y-5"><p class="text-slate-500 text-xs">Get credentials at <a href="https://my.telegram.org/apps" target="_blank" class="text-blue-400 underline">my.telegram.org/apps</a> → create an application.</p><div class="grid sm:grid-cols-2 gap-4"><div><label class="lbl">API ID *</label><input data-key="TELEGRAM_API_ID" class="inp" placeholder="12345678"></div><div><label class="lbl">API Hash *</label><input data-key="TELEGRAM_API_HASH" class="inp" placeholder="abc123..."></div></div><div><label class="lbl">Channels to monitor *</label><input data-key="TELEGRAM_CHANNELS" class="inp" placeholder="@F1_Visa_Slots,@AnotherChannel"><p class="text-[11px] text-slate-600 mt-1">Comma-separated, include @.</p></div><hr class="border-slate-800"><div><p class="text-sm font-semibold text-white mb-3">Telegram Login</p><div id="tg-status-area"><button onclick="checkTgSession()" class="btn-ghost text-xs px-3 py-2">Check session status</button></div></div></div>`,
-`<div class="space-y-5"><p class="text-slate-500 text-xs">Alerts arrive as Telegram messages from our bot — free and instant. One tap to connect:</p><div id="alerts-area" class="card-sm p-5 text-center"><p class="text-xs text-slate-500">Checking…</p></div><ul class="card-sm p-4 text-xs text-slate-500 space-y-1.5"><li>• Click Connect — Telegram opens with our bot</li><li>• Press <strong class="text-slate-400">Start</strong> in the chat — that's it</li><li>• Every alert lands in that chat within seconds of slots opening</li></ul></div>`,
-`<div class="space-y-4"><p class="text-slate-500 text-xs">Get an API key at <a href="https://checkvisaslots.com" target="_blank" class="text-blue-400 underline">checkvisaslots.com</a>.</p><div><label class="lbl">CVS API Key *</label><input type="password" data-key="CVS_API_KEY" class="inp" placeholder="••••••••"></div><div><label class="lbl">Locations</label><input data-key="CVS_LOCATIONS" class="inp" placeholder="CHENNAI,NEW DELHI"><p class="text-[11px] text-slate-600 mt-1">Uppercase, comma-separated. Blank = all.</p></div><div class="grid sm:grid-cols-2 gap-4"><div><label class="lbl">Poll interval (s)</label><input type="number" data-key="CVS_POLL_INTERVAL" class="inp" placeholder="780"><p class="text-[11px] text-slate-600 mt-1">Default 780. Min 300.</p></div><div><label class="lbl">Duration window (days)</label><input type="number" data-key="CVS_DURATION_DAYS" class="inp" placeholder="120"></div></div></div>`,
+`<div class="space-y-5 text-sm" style="color:var(--txt-2)"><p class="text-[15px] font-bold" style="color:var(--txt)">How it works</p><p class="text-[13px]">Visa Slot Monitor watches two sources in parallel and sends you a Telegram alert the moment F1 interview slots appear.</p><div class="grid sm:grid-cols-2 gap-3"><div class="card-sm p-4"><p class="font-semibold text-xs mb-2" style="color:#34d399">checkvisaslots.com API</p><p class="text-xs" style="color:var(--txt-3)">Polls on your interval; fires when confirmed open slots match your locations.</p></div><div class="card-sm p-4"><p class="font-semibold text-xs mb-2" style="color:#a5b4fc">Telegram channels</p><p class="text-xs" style="color:var(--txt-3)">AI reads each message in context and flags only present-tense "slots are open now" confirmations.</p></div></div><div class="card-sm p-4"><p class="font-semibold text-xs mb-2" style="color:#fbbf24">Instant Telegram alerts</p><p class="text-xs" style="color:var(--txt-3)">Alerts arrive as a Telegram message from our bot — free, instant, and reliable. You'll connect it in the Alerts step.</p></div><p class="text-xs" style="color:var(--txt-3)">Work through the steps on the left. Your settings are private to your account.</p></div>`,
+`<div class="space-y-5"><p class="text-xs" style="color:var(--txt-3)">Get credentials at <a href="https://my.telegram.org/apps" target="_blank" style="color:var(--accent-2);text-decoration:underline">my.telegram.org/apps</a> → create an application.</p><div class="grid sm:grid-cols-2 gap-4"><div><label class="lbl">API ID *</label><input data-key="TELEGRAM_API_ID" class="inp" placeholder="12345678"></div><div><label class="lbl">API Hash *</label><input data-key="TELEGRAM_API_HASH" class="inp" placeholder="abc123..."></div></div><div><label class="lbl">Channels to monitor *</label><input data-key="TELEGRAM_CHANNELS" class="inp" placeholder="@F1_Visa_Slots,@AnotherChannel"><p class="text-[11px] mt-1.5" style="color:var(--txt-3)">Comma-separated, include @.</p></div><hr style="border-color:var(--line)"><div><p class="text-sm font-bold mb-3" style="color:var(--txt)">Telegram Login</p><div id="tg-status-area"><button onclick="checkTgSession()" class="btn-ghost text-xs">Check session status</button></div></div></div>`,
+`<div class="space-y-5"><p class="text-xs" style="color:var(--txt-3)">Alerts arrive as Telegram messages from our bot — free and instant. One tap to connect:</p><div id="alerts-area" class="card-sm p-6 text-center"><p class="text-xs" style="color:var(--txt-3)">Checking…</p></div><ul class="card-sm p-4 text-xs space-y-2" style="color:var(--txt-3)"><li><span class="tick">1.</span> Click Connect — Telegram opens with our bot</li><li><span class="tick">2.</span> Press <strong style="color:var(--txt-2)">Start</strong> in the chat — that's it</li><li><span class="tick">3.</span> Every alert lands in that chat within seconds of slots opening</li></ul></div>`,
+`<div class="space-y-5"><p class="text-xs" style="color:var(--txt-3)">Get an API key at <a href="https://checkvisaslots.com" target="_blank" style="color:var(--accent-2);text-decoration:underline">checkvisaslots.com</a>.</p><div><label class="lbl">CVS API Key *</label><input type="password" data-key="CVS_API_KEY" class="inp" placeholder="••••••••"></div><div><label class="lbl">Locations</label><input data-key="CVS_LOCATIONS" class="inp" placeholder="CHENNAI,NEW DELHI"><p class="text-[11px] mt-1.5" style="color:var(--txt-3)">Uppercase, comma-separated. Blank = all locations.</p></div><div class="grid sm:grid-cols-2 gap-4"><div><label class="lbl">Poll interval (seconds)</label><input type="number" data-key="CVS_POLL_INTERVAL" class="inp" placeholder="780"><p class="text-[11px] mt-1.5" style="color:var(--txt-3)">Default 780. Min 300.</p></div><div><label class="lbl">Duration window (days)</label><input type="number" data-key="CVS_DURATION_DAYS" class="inp" placeholder="120"></div></div></div>`,
 ''];
 function collectInputs(){document.querySelectorAll('#step-body [data-key]').forEach(el=>{if(el.value.trim())draft[el.dataset.key]=el.value.trim();});}
-function reviewHtml(){const sens=new Set(['CVS_API_KEY','TELEGRAM_API_HASH']);const e=Object.entries(draft);if(!e.length)return '<p class="text-slate-600 text-sm">Nothing configured yet — go back through the steps.</p>';return `<p class="text-slate-500 text-xs mb-3">Review your configuration. Sensitive values are masked.</p><div class="card-sm divide-y divide-slate-800 mb-4 overflow-hidden">${e.map(([k,v])=>`<div class="flex items-center justify-between gap-4 px-3 py-2"><span class="text-[11px] font-mono text-slate-500 shrink-0">${k}</span><span class="text-[11px] font-mono text-slate-300 truncate">${sens.has(k)?'•'.repeat(Math.min(v.length,16)):esc(v)}</span></div>`).join('')}</div><button id="save-btn" onclick="saveConfig()" class="btn btn-success w-full">💾 Save Configuration</button><p class="text-[11px] text-slate-700 text-center mt-2">Saved to your account · processes start automatically once everything below is ready</p><div id="readiness" class="mt-5"></div>`;}
+function reviewHtml(){const sens=new Set(['CVS_API_KEY','TELEGRAM_API_HASH']);const e=Object.entries(draft);if(!e.length)return '<p class="text-sm" style="color:var(--txt-3)">Nothing configured yet — go back through the steps.</p>';return `<p class="text-xs mb-3" style="color:var(--txt-3)">Review your configuration. Sensitive values are masked.</p><div class="card-sm mb-4 overflow-hidden" style="border-radius:11px">${e.map(([k,v])=>`<div class="flex items-center justify-between gap-4 px-3.5 py-2.5 border-b last:border-0" style="border-color:var(--line)"><span class="text-[11px] font-mono shrink-0" style="color:var(--txt-3)">${k}</span><span class="text-[11px] font-mono truncate" style="color:var(--txt-2)">${sens.has(k)?'•'.repeat(Math.min(v.length,16)):esc(v)}</span></div>`).join('')}</div><button id="save-btn" onclick="saveConfig()" class="btn btn-success w-full">Save Configuration</button><p class="text-[11px] text-center mt-2.5" style="color:var(--txt-3)">Saved to your account · your monitor starts automatically once everything below is ready</p><div id="readiness" class="mt-6"></div>`;}
 
 async function checkReadiness(){
   const el=$('readiness'); if(!el) return;
-  el.innerHTML='<p class="text-xs text-slate-600">Checking launch readiness…</p>';
+  el.innerHTML='<p class="text-xs" style="color:var(--txt-3)">Checking launch readiness…</p>';
   let tg={authorized:false}, st={};
   try{tg=await api('/api/telegram/status');}catch{}
   try{st=await api('/api/status');}catch{}
-  const item=(ok,label,hint)=>`<div class="flex items-start gap-2.5 py-1.5"><span class="${ok?'text-green-400':'text-slate-600'} text-sm leading-5">${ok?'✓':'○'}</span><div class="flex-1"><p class="text-xs ${ok?'text-slate-300':'text-slate-400'}">${label}</p>${!ok&&hint?`<p class="text-[11px] text-amber-400/80 mt-0.5">${hint}</p>`:''}</div></div>`;
+  const item=(ok,label,hint)=>`<div class="flex items-start gap-3 py-2"><span class="text-sm leading-5 ${ok?'':'opacity-40'}" style="color:${ok?'var(--ok)':'var(--txt-3)'}">${ok?'✓':'○'}</span><div class="flex-1"><p class="text-xs font-medium" style="color:${ok?'var(--txt-2)':'var(--txt-2)'}">${label}</p>${!ok&&hint?`<p class="text-[11px] mt-0.5" style="color:var(--warn);opacity:.85">${hint}</p>`:''}</div></div>`;
   const cfgOk=isConfigured();
-  el.innerHTML=`<div class="card-sm p-4"><p class="text-xs font-semibold text-white mb-1.5">Launch readiness</p>
+  el.innerHTML=`<div class="card-sm p-5"><p class="text-xs font-bold mb-2" style="color:var(--txt)">Launch readiness</p>
     ${item(cfgOk,'Configuration saved',cfgOk?'':'Fill all required fields, then Save')}
     ${item(tg.authorized,'Telegram account linked',tg.authorized?'':'Go to the <strong>Telegram</strong> step and complete the phone / OTP login')}
     ${item(st.alerts_linked,'Telegram alerts connected',st.alerts_linked?'':'Go to the <strong>Alerts</strong> step and connect the bot')}
@@ -318,7 +463,7 @@ async function checkReadiness(){
   </div>`;
 }
 function renderStepNav(){$('step-nav').innerHTML=STEPS.map((s,i)=>`<button class="step-btn ${i===curStep?'active':i<curStep?'done':''}" onclick="goStep(${i})"><span class="step-num">${i<curStep?'✓':i+1}</span>${s.title}</button>`).join('');}
-function renderStep(i){const html=i===STEPS.length-1?reviewHtml():STEP_HTML[i];$('step-body').innerHTML=`<div class="space-y-5"><div><div class="flex items-center gap-2 mb-0.5"><span class="text-xl">${STEPS[i].icon}</span><h2 class="text-base font-bold text-white">${STEPS[i].title}</h2></div><p class="text-[11px] text-slate-600">Step ${i+1} of ${STEPS.length}</p></div><div>${html}</div><div class="flex justify-between pt-1 border-t border-slate-800/50"><button onclick="goStep(${i-1})" class="${i===0?'invisible':''} btn-ghost">← Back</button>${i<STEPS.length-1?`<button onclick="goStep(${i+1})" class="btn btn-primary">Next →</button>`:''}</div></div>`;document.querySelectorAll('#step-body [data-key]').forEach(el=>{if(draft[el.dataset.key]!==undefined)el.value=draft[el.dataset.key];});
+function renderStep(i){const html=i===STEPS.length-1?reviewHtml():STEP_HTML[i];$('step-body').innerHTML=`<div class="space-y-6"><div><h2 class="text-base font-bold" style="color:var(--txt);letter-spacing:-.01em">${STEPS[i].title}</h2><p class="text-[11px] mt-0.5" style="color:var(--txt-3)">Step ${i+1} of ${STEPS.length}</p></div><div>${html}</div><div class="flex justify-between pt-4 border-t" style="border-color:var(--line)"><button onclick="goStep(${i-1})" class="${i===0?'invisible':''} btn-ghost">← Back</button>${i<STEPS.length-1?`<button onclick="goStep(${i+1})" class="btn btn-primary">Continue →</button>`:''}</div></div>`;document.querySelectorAll('#step-body [data-key]').forEach(el=>{if(draft[el.dataset.key]!==undefined)el.value=draft[el.dataset.key];});
   if(i===1)checkTgSession();             // auto-prompt Telegram login
   if(i===2)checkAlertsStatus();          // alert bot link state
   if(i===STEPS.length-1)checkReadiness(); // launch readiness checklist
@@ -334,15 +479,15 @@ async function checkAlertsStatus(){
       clearInterval(alertsPollTimer); alertsPollTimer=null;
       a.innerHTML=`<div class="badge badge-green mb-3">✓ Telegram alerts connected</div><div><button onclick="testAlert()" class="btn-ghost text-xs" id="test-alert-btn">Send test alert</button></div>`;
     }else{
-      a.innerHTML=`<p class="text-xs text-slate-400 mb-3">Not connected yet</p><button onclick="connectAlerts()" class="btn btn-primary" id="connect-alerts-btn">🔔 Connect Telegram alerts</button>`;
+      a.innerHTML=`<p class="text-xs mb-4" style="color:var(--txt-2)">Not connected yet</p><button onclick="connectAlerts()" class="btn btn-primary" id="connect-alerts-btn">Connect Telegram alerts</button>`;
     }
-  }catch(e){a.innerHTML=`<p class="text-xs text-amber-400">${esc(e.message)}</p>`;}
+  }catch(e){a.innerHTML=`<p class="text-xs" style="color:var(--warn)">${esc(e.message)}</p>`;}
 }
 async function connectAlerts(){
   try{
     const {url}=await api('/api/alerts/link',{method:'POST'});
     window.open(url,'_blank');
-    $('alerts-area').innerHTML=`<p class="text-xs text-slate-400 mb-2">Telegram opened — press <strong class="text-white">Start</strong> in the bot chat.</p><p class="text-[11px] text-slate-600 flex items-center justify-center gap-2"><span class="dot dot-on"></span> Waiting for you to press Start…</p>`;
+    $('alerts-area').innerHTML=`<p class="text-xs mb-2" style="color:var(--txt-2)">Telegram opened — press <strong style="color:var(--txt)">Start</strong> in the bot chat.</p><p class="text-[11px] flex items-center justify-center gap-2" style="color:var(--txt-3)"><span class="dot dot-on"></span> Waiting for you to press Start…</p>`;
     clearInterval(alertsPollTimer);
     alertsPollTimer=setInterval(async()=>{
       try{const {linked}=await api('/api/alerts/status');
@@ -358,22 +503,22 @@ async function testAlert(){
   if(b){b.disabled=false;b.textContent='Send test alert';}
 }
 function goStep(i){if(i<0||i>=STEPS.length)return;collectInputs();curStep=i;renderStepNav();renderStep(i);}
-async function saveConfig(){collectInputs();const b=$('save-btn');b.disabled=true;b.textContent='Saving…';try{await api('/api/config',{method:'POST',body:JSON.stringify({data:draft})});b.textContent='✅ Saved!';showToast('Configuration saved');refreshDash();checkReadiness();setTimeout(checkReadiness,3000);}catch(e){b.textContent='❌ Failed';b.disabled=false;showToast(e.message,true);}}
+async function saveConfig(){collectInputs();const b=$('save-btn');b.disabled=true;b.textContent='Saving…';try{await api('/api/config',{method:'POST',body:JSON.stringify({data:draft})});b.textContent='✓ Saved!';showToast('Configuration saved');refreshDash();checkReadiness();setTimeout(checkReadiness,3000);}catch(e){b.textContent='Save failed — retry';b.disabled=false;showToast(e.message,true);}}
 async function initSetup(){try{draft=await api('/api/config');}catch{}renderStepNav();renderStep(0);}
 
 // ── Telegram OTP ──
-async function checkTgSession(){const a=$('tg-status-area');a.innerHTML='<span class="text-xs text-slate-500">Checking…</span>';try{const r=await api('/api/telegram/status');if(r.authorized)a.innerHTML='<div class="badge badge-green text-xs">✓ Session active — logged in</div>';else if(r.reason==='credentials_not_set')a.innerHTML='<span class="text-xs text-yellow-400">Save your Telegram API ID & Hash first (above), then check again.</span>';else showTgPhone(a,r.reason);}catch(e){a.innerHTML=`<span class="text-red-400 text-xs">${esc(e.message)}</span>`;}}
-function showTgPhone(a,reason){a.innerHTML=`<p class="text-xs text-slate-500 mb-2">${reason==='no_session'?'No session — log in below.':'Session invalid — log in again.'}</p><div class="flex gap-2"><input id="tg-phone" class="inp" style="max-width:220px" placeholder="+1XXXXXXXXXX" type="tel" autocomplete="off"><button onclick="tgSendCode()" class="btn btn-primary whitespace-nowrap" id="tg-send-btn">Send OTP</button></div>`;}
+async function checkTgSession(){const a=$('tg-status-area');a.innerHTML='<span class="text-xs" style="color:var(--txt-3)">Checking…</span>';try{const r=await api('/api/telegram/status');if(r.authorized)a.innerHTML='<div class="badge badge-green text-xs">✓ Session active — logged in</div>';else if(r.reason==='credentials_not_set')a.innerHTML='<span class="text-xs" style="color:var(--warn)">Save your Telegram API ID & Hash first (above), then check again.</span>';else showTgPhone(a,r.reason);}catch(e){a.innerHTML=`<span class="text-xs" style="color:var(--err)">${esc(e.message)}</span>`;}}
+function showTgPhone(a,reason){a.innerHTML=`<p class="text-xs mb-2.5" style="color:var(--txt-3)">${reason==='no_session'?'No session — log in below.':'Session invalid — log in again.'}</p><div class="flex gap-2"><input id="tg-phone" class="inp" style="max-width:220px" placeholder="+1XXXXXXXXXX" type="tel" autocomplete="off"><button onclick="tgSendCode()" class="btn btn-primary whitespace-nowrap" id="tg-send-btn">Send OTP</button></div>`;}
 async function tgSendCode(){const p=$('tg-phone')?.value?.trim();if(!p){showToast('Enter phone',true);return;}const b=$('tg-send-btn');b.disabled=true;b.textContent='Sending…';try{await api('/api/telegram/send-code',{method:'POST',body:JSON.stringify({phone:p})});showTgCode($('tg-status-area'),p);}catch(e){showToast(e.message,true);b.disabled=false;b.textContent='Send OTP';}}
-function showTgCode(a,phone){a.innerHTML=`<p class="text-xs text-green-400 mb-2">✓ Code sent to ${esc(phone)}</p><div class="flex gap-2 mb-2"><input id="tg-code" class="inp" style="max-width:160px" placeholder="12345" maxlength="6"><button onclick="tgVerify('${esc(phone)}')" class="btn btn-primary" id="tg-verify-btn">Verify</button></div><button onclick="showTgPhone($('tg-status-area'),'')" class="text-xs text-slate-600 underline">← Wrong number</button>`;}
+function showTgCode(a,phone){a.innerHTML=`<p class="text-xs mb-2.5" style="color:var(--ok)">✓ Code sent to ${esc(phone)}</p><div class="flex gap-2 mb-2.5"><input id="tg-code" class="inp" style="max-width:160px" placeholder="12345" maxlength="6"><button onclick="tgVerify('${esc(phone)}')" class="btn btn-primary" id="tg-verify-btn">Verify</button></div><button onclick="showTgPhone($('tg-status-area'),'')" class="text-xs underline" style="color:var(--txt-3);background:none;border:none;cursor:pointer">← Wrong number</button>`;}
 async function tgVerify(phone){const c=$('tg-code')?.value?.trim();if(!c)return;const b=$('tg-verify-btn');b.disabled=true;b.textContent='Verifying…';try{const r=await api('/api/telegram/verify-code',{method:'POST',body:JSON.stringify({phone,code:c})});if(r.needs_2fa)show2FA($('tg-status-area'));else{$('tg-status-area').innerHTML='<div class="badge badge-green">✓ Logged in to Telegram!</div>';showToast('Telegram session saved');}}catch(e){showToast(e.message,true);b.disabled=false;b.textContent='Verify';}}
-function show2FA(a){a.innerHTML=`<p class="text-xs text-yellow-400 mb-2">Two-factor enabled on your account.</p><div class="flex gap-2"><input id="tg-2fa" class="inp" style="max-width:200px" placeholder="2FA password" type="password"><button onclick="tg2FA()" class="btn btn-primary" id="tg-2fa-btn">Submit</button></div>`;}
+function show2FA(a){a.innerHTML=`<p class="text-xs mb-2.5" style="color:var(--warn)">Two-factor enabled on your account.</p><div class="flex gap-2"><input id="tg-2fa" class="inp" style="max-width:200px" placeholder="2FA password" type="password"><button onclick="tg2FA()" class="btn btn-primary" id="tg-2fa-btn">Submit</button></div>`;}
 async function tg2FA(){const p=$('tg-2fa')?.value?.trim();if(!p)return;const b=$('tg-2fa-btn');b.disabled=true;b.textContent='Checking…';try{await api('/api/telegram/2fa',{method:'POST',body:JSON.stringify({password:p})});$('tg-status-area').innerHTML='<div class="badge badge-green">✓ Logged in to Telegram!</div>';showToast('Telegram session saved');}catch(e){showToast(e.message,true);b.disabled=false;b.textContent='Submit';}}
 
 // ── Logs ──
 let logLines=[], es=null;
 function logClass(t){if(/\[ERROR\]/.test(t))return 'l-err';if(/\[WARNING\]/.test(t))return 'l-warn';if(/\[DEBUG\]/.test(t))return 'l-dbg';return 'l-info';}
-function renderLogs(){const f=$('log-filter')?.value??'all';const box=$('log-box');const lines=f==='all'?logLines:logLines.filter(l=>l.source===f);if(!lines.length){box.innerHTML='<span class="text-slate-700 text-xs">No log lines yet…</span>';return;}box.innerHTML=lines.map(l=>{const src=l.source==='monitor'?'<span class="text-blue-500/60 text-[10px] w-14 text-right shrink-0">[monitor]</span>':'<span class="text-orange-500/60 text-[10px] w-14 text-right shrink-0">[fwdr]</span>';return `<div class="flex gap-2">${src}<span class="${logClass(l.text)} break-all">${esc(l.text)}</span></div>`;}).join('');if($('chk-scroll')?.checked)box.scrollTop=box.scrollHeight;}
+function renderLogs(){const f=$('log-filter')?.value??'all';const box=$('log-box');const lines=f==='all'?logLines:logLines.filter(l=>l.source===f);if(!lines.length){box.innerHTML='<span class="text-xs" style="color:var(--txt-3)">No log lines yet…</span>';return;}box.innerHTML=lines.map(l=>`<div class="flex gap-2"><span class="text-[10px] w-14 text-right shrink-0" style="color:#4b4b6a">[${esc(l.source||'?')}]</span><span class="${logClass(l.text)} break-all">${esc(l.text)}</span></div>`).join('');if($('chk-scroll')?.checked)box.scrollTop=box.scrollHeight;}
 function startSSE(){if(es)es.close();es=new EventSource('/api/logs/stream');es.onmessage=e=>{logLines.push(JSON.parse(e.data));if(logLines.length>2000)logLines.shift();if(activePage==='logs')renderLogs();};es.onerror=()=>{es.close();setTimeout(startSSE,3000);};}
 
 // ── Boot ──
