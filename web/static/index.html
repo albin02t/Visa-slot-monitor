@@ -134,7 +134,19 @@
     .page-head{font-family:'Chakra Petch',sans-serif;font-size:1.7rem;font-weight:700;letter-spacing:0;color:var(--txt)}
     .uptime-chip{display:inline-flex;align-items:center;gap:7px;padding:5px 13px;border-radius:99px;font-size:12.5px;font-weight:600;
                  background:rgba(74,222,128,.08);border:1px solid rgba(74,222,128,.25);color:#4ade80}
-    #confetti-canvas{position:fixed;inset:0;pointer-events:none;z-index:100}
+    #flap-overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+      background:rgba(2,5,8,.88);backdrop-filter:blur(5px);opacity:0;pointer-events:none;transition:opacity .5s}
+    #flap-overlay.show{opacity:1}
+    .flap-row{display:flex;gap:5px;justify-content:center;margin:6px 0;flex-wrap:nowrap}
+    .flap-cell{width:34px;height:48px;display:flex;align-items:center;justify-content:center;
+      background:linear-gradient(180deg,#16211a 48%,#0a110d 52%);border:1px solid #263b2e;border-radius:5px;
+      font-family:'Chakra Petch',monospace;font-weight:700;font-size:25px;color:#4ade80;position:relative;overflow:hidden}
+    .flap-cell::after{content:'';position:absolute;left:0;right:0;top:50%;height:1px;background:rgba(0,0,0,.6)}
+    .flap-cell.blank{background:transparent;border-color:transparent}
+    .flap-cell.flip{animation:flapflip .14s linear infinite}
+    .flap-cell.set{animation:none;box-shadow:0 0 16px rgba(74,222,128,.3)}
+    @keyframes flapflip{0%{transform:scaleY(1)}50%{transform:scaleY(.55)}100%{transform:scaleY(1)}}
+    @media (max-width:640px){.flap-cell{width:22px;height:34px;font-size:16px}}
   </style>
 </head>
 <body>
@@ -427,7 +439,7 @@
   </main>
 </div>
 
-<canvas id="confetti-canvas"></canvas>
+<div id="flap-overlay"></div>
 <div id="toast" class="fixed bottom-5 right-5 hide text-[15.5px] px-4 py-2.5 rounded-xl shadow-2xl border z-50"></div>
 
 <script>
@@ -472,17 +484,31 @@ function spawnBlip(green=false){
 }
 
 // ── Confetti (all-systems-go celebration) ──
-function confetti(){
-  const c=$('confetti-canvas'),x=c.getContext('2d');
-  c.width=innerWidth;c.height=innerHeight;
-  const cols=['#4ade80','#2dd4bf','#fbbf24','#38bdf8','#f472b6'];
-  const ps=Array.from({length:120},()=>({x:innerWidth/2+(Math.random()-.5)*200,y:innerHeight*0.4,vx:(Math.random()-.5)*11,vy:-(4+Math.random()*9),g:.25+Math.random()*.2,s:4+Math.random()*5,c:cols[Math.random()*cols.length|0],r:Math.random()*Math.PI,vr:(Math.random()-.5)*.3,life:1}));
-  (function frame(){
-    x.clearRect(0,0,c.width,c.height);let alive=false;
-    for(const p of ps){p.x+=p.vx;p.vy+=p.g;p.y+=p.vy;p.r+=p.vr;p.life-=.006;
-      if(p.life>0&&p.y<c.height+20){alive=true;x.save();x.globalAlpha=Math.max(p.life,0);x.translate(p.x,p.y);x.rotate(p.r);x.fillStyle=p.c;x.fillRect(-p.s/2,-p.s/2,p.s,p.s*0.6);x.restore();}}
-    if(alive)requestAnimationFrame(frame);else x.clearRect(0,0,c.width,c.height);
-  })();
+function celebrate(){
+  const lines=['RADAR ONLINE','ALL SYSTEMS GO'];
+  const CH='ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  const ov=$('flap-overlay');
+  ov.innerHTML='';
+  lines.forEach((txt,r)=>{
+    const row=document.createElement('div');row.className='flap-row';
+    [...txt].forEach((target,i)=>{
+      const cell=document.createElement('span');
+      cell.className='flap-cell'+(target===' '?' blank':'');
+      cell.textContent='\u00a0';row.appendChild(cell);
+      if(target!==' '){
+        const delay=300+i*95+r*700;
+        let n=0,max=5+Math.floor(Math.random()*7);
+        setTimeout(()=>{cell.classList.add('flip');
+          const t=setInterval(()=>{n++;
+            cell.textContent=n>=max?target:CH[Math.random()*CH.length|0];
+            if(n>=max){clearInterval(t);cell.classList.remove('flip');cell.classList.add('set');}
+          },75);},delay);
+      }
+    });
+    ov.appendChild(row);
+  });
+  ov.classList.add('show');
+  setTimeout(()=>{ov.classList.remove('show');setTimeout(()=>ov.innerHTML='',600);},5600);
 }
 
 // ── Auth ──
@@ -551,6 +577,7 @@ async function refreshDash(){
     }
     _lastAl=al.length;_lastEventTotal=total;
 
+    if(st.monitor&&st.alerts_linked&&!localStorage.getItem('vsm_celebrated'))checkReadiness();
     setNum('s-alerts',al.length);setNum('s-cvs',cvs.length);setNum('s-tg',tg.length);
     const rem=cvs.find(c=>c.api_remaining)?.api_remaining;
     if(rem!==undefined&&rem!==null&&rem!=='?')setNum('s-remaining',rem);else $('s-remaining').textContent='—';
@@ -567,15 +594,13 @@ const STEPS=[{title:'Briefing'},{title:'Telegram'},{title:'Alerts'},{title:'Slot
 let curStep=0, draft={};
 const STEP_HTML=[
 `<div class="space-y-5 text-[15.5px]" style="color:var(--txt-2)"><p class="text-[15px]">Your radar watches two sources in parallel and pings your Telegram the moment F1 interview slots appear.</p><div class="grid sm:grid-cols-2 gap-3"><div class="card-sm p-4"><p class="font-semibold text-[14px] mb-2" style="color:#4ade80">checkvisaslots.com API</p><p class="text-[14px]" style="color:var(--txt-3)">Polls on your interval; fires when confirmed open slots match your locations.</p></div><div class="card-sm p-4"><p class="font-semibold text-[14px] mb-2" style="color:#5eead4">Telegram channels</p><p class="text-[14px]" style="color:var(--txt-3)">AI reads each message in context and flags only present-tense "slots are open now" confirmations.</p></div></div><div class="card-sm p-4"><p class="font-semibold text-[14px] mb-2" style="color:#fbbf24">Instant Telegram alerts</p><p class="text-[14px]" style="color:var(--txt-3)">Alerts arrive from our bot — free, instant, reliable. You'll connect it in the Alerts checkpoint.</p></div><p class="text-[14px]" style="color:var(--txt-3)">Clear each checkpoint on the left — the readiness bar tracks your progress. Your settings are private to your account.</p></div>`,
-`<div class="space-y-5"><p class="text-[14px]" style="color:var(--txt-3)">Get credentials at <a href="https://my.telegram.org/apps" target="_blank" style="color:#4ade80;text-decoration:underline">my.telegram.org/apps</a> → create an application.</p><div class="grid sm:grid-cols-2 gap-4"><div><label class="lbl">API ID *</label><input data-key="TELEGRAM_API_ID" class="inp" placeholder="12345678"></div><div><label class="lbl">API Hash *</label><input data-key="TELEGRAM_API_HASH" class="inp" placeholder="abc123..."></div></div><div><label class="lbl">Channels to monitor *</label><input data-key="TELEGRAM_CHANNELS" class="inp" placeholder="@F1_Visa_Slots,@AnotherChannel"><p class="text-[13px] mt-1.5" style="color:var(--txt-3)">Comma-separated, include @.</p></div><hr style="border-color:var(--line)"><div><p class="text-[15.5px] font-bold mb-3 display" style="color:var(--txt)">Telegram Login</p><div id="tg-status-area"><button onclick="checkTgSession()" class="btn-ghost text-[14px]">Check session status</button></div></div></div>`,
+`<div class="space-y-5"><p class="text-[14px]" style="color:var(--txt-3)">Get credentials at <a href="https://my.telegram.org/apps" target="_blank" style="color:#4ade80;text-decoration:underline">my.telegram.org/apps</a> → create an application.</p><div class="grid sm:grid-cols-2 gap-4"><div><label class="lbl">API ID *</label><input data-key="TELEGRAM_API_ID" class="inp" placeholder="12345678"></div><div><label class="lbl">API Hash *</label><input data-key="TELEGRAM_API_HASH" class="inp" placeholder="abc123..."></div></div><div><label class="lbl">Channels to monitor *</label><input data-key="TELEGRAM_CHANNELS" class="inp" placeholder="@F1_Visa_Slots,@AnotherChannel"><p class="text-[13px] mt-1.5" style="color:var(--txt-3)">Comma-separated, include @.</p></div><hr style="border-color:var(--line)"><div><p class="text-[15.5px] font-bold mb-3 display" style="color:var(--txt)">Verify your Telegram account <span class="badge badge-yellow" style="margin-left:6px">Required</span></p><p class="text-[13px] mb-3" style="color:var(--txt-3)">Fill the three fields above, then log in with an OTP — <strong style="color:var(--txt-2)">Continue unlocks after this</strong>.</p><div id="tg-status-area"><button onclick="checkTgSession()" class="btn-ghost text-[14px]">Check session status</button></div></div></div>`,
 `<div class="space-y-5"><p class="text-[14px]" style="color:var(--txt-3)">Alerts arrive as Telegram messages from our bot — free and instant. One tap to connect:</p><div id="alerts-area" class="card-sm p-6 text-center"><p class="text-[14px]" style="color:var(--txt-3)">Checking…</p></div><ul class="card-sm p-4 text-[14px] space-y-2" style="color:var(--txt-3)"><li><span style="color:#4ade80;font-weight:700">1.</span> Click Connect — Telegram opens with our bot</li><li><span style="color:#4ade80;font-weight:700">2.</span> Press <strong style="color:var(--txt-2)">Start</strong> in the chat — that's it</li><li><span style="color:#4ade80;font-weight:700">3.</span> Every alert lands in that chat within seconds</li></ul></div>`,
 `<div class="space-y-5"><p class="text-[14px]" style="color:var(--txt-3)">Get an API key at <a href="https://checkvisaslots.com" target="_blank" style="color:#4ade80;text-decoration:underline">checkvisaslots.com</a>.</p><div><label class="lbl">CVS API Key *</label><input type="password" data-key="CVS_API_KEY" class="inp" placeholder="••••••••"></div><div><label class="lbl">Locations</label><input data-key="CVS_LOCATIONS" class="inp" placeholder="CHENNAI,NEW DELHI"><p class="text-[13px] mt-1.5" style="color:var(--txt-3)">Uppercase, comma-separated. Blank = all locations.</p></div><div class="grid sm:grid-cols-2 gap-4"><div><label class="lbl">Poll interval (seconds)</label><input type="number" data-key="CVS_POLL_INTERVAL" class="inp" placeholder="780"><p class="text-[13px] mt-1.5" style="color:var(--txt-3)">Default 780. Min 300.</p></div><div><label class="lbl">Duration window (days)</label><input type="number" data-key="CVS_DURATION_DAYS" class="inp" placeholder="120"></div></div></div>`,
 ''];
 function collectInputs(){document.querySelectorAll('#step-body [data-key]').forEach(el=>{if(el.value.trim())draft[el.dataset.key]=el.value.trim();});}
 function reviewHtml(){const sens=new Set(['CVS_API_KEY','TELEGRAM_API_HASH']);const e=Object.entries(draft);if(!e.length)return '<p class="text-[15.5px]" style="color:var(--txt-3)">Nothing configured yet — clear the earlier checkpoints first.</p>';return `<p class="text-[14px] mb-3" style="color:var(--txt-3)">Final check. Sensitive values are masked.</p><div class="card-sm mb-4 overflow-hidden" style="border-radius:11px">${e.map(([k,v])=>`<div class="flex items-center justify-between gap-4 px-3.5 py-2.5 border-b last:border-0" style="border-color:var(--line)"><span class="text-[13px] font-mono shrink-0" style="color:var(--txt-3)">${k}</span><span class="text-[13px] font-mono truncate" style="color:var(--txt-2)">${sens.has(k)?'•'.repeat(Math.min(v.length,16)):esc(v)}</span></div>`).join('')}</div><button id="save-btn" onclick="saveConfig()" class="btn btn-success w-full">🛰️ Save & bring radar online</button><p class="text-[13px] text-center mt-2.5" style="color:var(--txt-3)">Saved to your account · the radar starts automatically once every system below is green</p><div id="readiness" class="mt-6"></div>`;}
 
-let _wasAllReady=sessionStorage.getItem('vsm_celebrated')==='1';
-let _readyBaselined=false;
 async function checkReadiness(){
   const el=$('readiness');
   let tg={authorized:false}, st={};
@@ -590,8 +615,7 @@ async function checkReadiness(){
   ];
   const done=checks.filter(c=>c[0]).length, pct=Math.round(done/checks.length*100);
   if($('ready-pct')){$('ready-pct').textContent=pct+'%';$('ready-bar').style.width=pct+'%';}
-  if(!_readyBaselined){_readyBaselined=true;if(done===checks.length)_wasAllReady=true;}
-  else if(done===checks.length&&!_wasAllReady){_wasAllReady=true;sessionStorage.setItem('vsm_celebrated','1');confetti();showToast('🛰️ All systems go — your radar is live!');}
+  if(done===checks.length&&!localStorage.getItem('vsm_celebrated')){localStorage.setItem('vsm_celebrated','1');celebrate();showToast('🛰️ All systems go — your radar is live!');}
   if(!el) return;
   const item=(ok,label,hint)=>`<div class="flex items-start gap-3 py-2"><span class="text-[15.5px] leading-5" style="color:${ok?'#4ade80':'var(--txt-3)'}">${ok?'✓':'○'}</span><div class="flex-1"><p class="text-[14px] font-medium" style="color:var(--txt-2)">${label}</p>${!ok&&hint?`<p class="text-[13px] mt-0.5" style="color:var(--warn);opacity:.85">${hint}</p>`:''}</div></div>`;
   el.innerHTML=`<div class="card-sm p-5"><div class="flex items-center justify-between mb-2"><p class="text-[14px] font-bold display" style="color:var(--txt)">Pre-flight checks</p><span class="badge ${done===4?'badge-green':'badge-gray'}">${done}/4</span></div>
@@ -599,7 +623,7 @@ async function checkReadiness(){
   </div>`;
 }
 function renderStepNav(){$('step-nav').innerHTML=STEPS.map((s,i)=>`<button class="step-btn ${i===curStep?'active':i<curStep?'done':''}" onclick="goStep(${i})"><span class="step-num">${i<curStep?'✓':i+1}</span>${s.title}</button>`).join('');}
-function renderStep(i){const html=i===STEPS.length-1?reviewHtml():STEP_HTML[i];$('step-body').innerHTML=`<div class="space-y-6"><div><h2 class="text-base font-bold display" style="color:var(--txt);letter-spacing:-.01em">${STEPS[i].title}</h2><p class="text-[13px] mt-0.5" style="color:var(--txt-3)">Checkpoint ${i+1} of ${STEPS.length}</p></div><div>${html}</div><div class="flex justify-between pt-4 border-t" style="border-color:var(--line)"><button onclick="goStep(${i-1})" class="${i===0?'invisible':''} btn-ghost">← Back</button>${i<STEPS.length-1?`<button onclick="goStep(${i+1})" class="btn btn-primary">Continue →</button>`:''}</div></div>`;document.querySelectorAll('#step-body [data-key]').forEach(el=>{if(draft[el.dataset.key]!==undefined)el.value=draft[el.dataset.key];});
+function renderStep(i){const html=i===STEPS.length-1?reviewHtml():STEP_HTML[i];$('step-body').innerHTML=`<div class="space-y-6"><div><h2 class="text-base font-bold display" style="color:var(--txt);letter-spacing:-.01em">${STEPS[i].title}</h2><p class="text-[13px] mt-0.5" style="color:var(--txt-3)">Checkpoint ${i+1} of ${STEPS.length}</p></div><div>${html}</div><div class="flex justify-between pt-4 border-t" style="border-color:var(--line)"><button onclick="goStep(${i-1})" class="${i===0?'invisible':''} btn-ghost">← Back</button>${i<STEPS.length-1?`<button id="cont-btn" onclick="goStep(${i+1})" class="btn btn-primary" ${i===1?'disabled title="Complete the Telegram login below first"':''}>Continue →</button>`:''}</div></div>`;document.querySelectorAll('#step-body [data-key]').forEach(el=>{if(draft[el.dataset.key]!==undefined)el.value=draft[el.dataset.key];});
   if(i===1)checkTgSession();
   if(i===2)checkAlertsStatus();
   if(i===STEPS.length-1)checkReadiness();
@@ -657,13 +681,14 @@ async function saveConfig(){collectInputs();const b=$('save-btn');b.disabled=tru
 async function initSetup(){try{draft=await api('/api/config');}catch{}renderStepNav();renderStep(0);}
 
 // ── Telegram OTP ──
-async function checkTgSession(){const a=$('tg-status-area');a.innerHTML='<span class="text-[14px]" style="color:var(--txt-3)">Checking…</span>';try{const r=await api('/api/telegram/status');if(r.authorized)a.innerHTML='<div class="badge badge-green text-[14px]">✓ Session active — logged in</div>';else if(r.reason==='credentials_not_set')a.innerHTML='<span class="text-[14px]" style="color:var(--warn)">Save your Telegram API ID & Hash first (above), then check again.</span>';else showTgPhone(a,r.reason);}catch(e){a.innerHTML=`<span class="text-[14px]" style="color:var(--err)">${esc(e.message)}</span>`;}}
+function _setCont(on){const b=$('cont-btn');if(b){b.disabled=!on;}}
+async function checkTgSession(){const a=$('tg-status-area');a.innerHTML='<span class="text-[14px]" style="color:var(--txt-3)">Checking…</span>';try{const r=await api('/api/telegram/status');if(r.authorized){a.innerHTML='<div class="badge badge-green text-[14px]">✓ Account verified — you can continue</div>';_setCont(true);}else{_setCont(false);showTgPhone(a,r.reason);}}catch(e){a.innerHTML=`<span class="text-[14px]" style="color:var(--err)">${esc(e.message)}</span>`;_setCont(false);}}
 function showTgPhone(a,reason){a.innerHTML=`<p class="text-[14px] mb-2.5" style="color:var(--txt-3)">${reason==='no_session'?'No session — log in below.':'Session invalid — log in again.'}</p><div class="flex gap-2"><input id="tg-phone" class="inp" style="max-width:220px" placeholder="+1XXXXXXXXXX" type="tel" autocomplete="off"><button onclick="tgSendCode()" class="btn btn-primary whitespace-nowrap" id="tg-send-btn">Send OTP</button></div>`;}
-async function tgSendCode(){const p=$('tg-phone')?.value?.trim();if(!p){showToast('Enter phone',true);return;}const b=$('tg-send-btn');b.disabled=true;b.textContent='Sending…';try{await api('/api/telegram/send-code',{method:'POST',body:JSON.stringify({phone:p})});showTgCode($('tg-status-area'),p);}catch(e){showToast(e.message,true);b.disabled=false;b.textContent='Send OTP';}}
+async function tgSendCode(){const p=$('tg-phone')?.value?.trim();if(!p){showToast('Enter phone',true);return;}const b=$('tg-send-btn');b.disabled=true;b.textContent='Sending…';try{collectInputs();await api('/api/config',{method:'POST',body:JSON.stringify({data:draft})});await api('/api/telegram/send-code',{method:'POST',body:JSON.stringify({phone:p})});showTgCode($('tg-status-area'),p);}catch(e){showToast(e.message,true);b.disabled=false;b.textContent='Send OTP';}}
 function showTgCode(a,phone){a.innerHTML=`<p class="text-[14px] mb-2.5" style="color:#4ade80">✓ Code sent to ${esc(phone)}</p><div class="flex gap-2 mb-2.5"><input id="tg-code" class="inp" style="max-width:160px" placeholder="12345" maxlength="6"><button onclick="tgVerify('${esc(phone)}')" class="btn btn-primary" id="tg-verify-btn">Verify</button></div><button onclick="showTgPhone($('tg-status-area'),'')" class="text-[14px] underline" style="color:var(--txt-3);background:none;border:none;cursor:pointer">← Wrong number</button>`;}
-async function tgVerify(phone){const c=$('tg-code')?.value?.trim();if(!c)return;const b=$('tg-verify-btn');b.disabled=true;b.textContent='Verifying…';try{const r=await api('/api/telegram/verify-code',{method:'POST',body:JSON.stringify({phone,code:c})});if(r.needs_2fa)show2FA($('tg-status-area'));else{$('tg-status-area').innerHTML='<div class="badge badge-green">✓ Logged in to Telegram!</div>';showToast('Telegram session saved');checkReadiness();}}catch(e){showToast(e.message,true);b.disabled=false;b.textContent='Verify';}}
+async function tgVerify(phone){const c=$('tg-code')?.value?.trim();if(!c)return;const b=$('tg-verify-btn');b.disabled=true;b.textContent='Verifying…';try{const r=await api('/api/telegram/verify-code',{method:'POST',body:JSON.stringify({phone,code:c})});if(r.needs_2fa)show2FA($('tg-status-area'));else{$('tg-status-area').innerHTML='<div class="badge badge-green">✓ Logged in to Telegram!</div>';_setCont(true);showToast('Telegram session saved');checkReadiness();}}catch(e){showToast(e.message,true);b.disabled=false;b.textContent='Verify';}}
 function show2FA(a){a.innerHTML=`<p class="text-[14px] mb-2.5" style="color:var(--warn)">Two-factor enabled on your account.</p><div class="flex gap-2"><input id="tg-2fa" class="inp" style="max-width:200px" placeholder="2FA password" type="password"><button onclick="tg2FA()" class="btn btn-primary" id="tg-2fa-btn">Submit</button></div>`;}
-async function tg2FA(){const p=$('tg-2fa')?.value?.trim();if(!p)return;const b=$('tg-2fa-btn');b.disabled=true;b.textContent='Checking…';try{await api('/api/telegram/2fa',{method:'POST',body:JSON.stringify({password:p})});$('tg-status-area').innerHTML='<div class="badge badge-green">✓ Logged in to Telegram!</div>';showToast('Telegram session saved');checkReadiness();}catch(e){showToast(e.message,true);b.disabled=false;b.textContent='Submit';}}
+async function tg2FA(){const p=$('tg-2fa')?.value?.trim();if(!p)return;const b=$('tg-2fa-btn');b.disabled=true;b.textContent='Checking…';try{await api('/api/telegram/2fa',{method:'POST',body:JSON.stringify({password:p})});$('tg-status-area').innerHTML='<div class="badge badge-green">✓ Logged in to Telegram!</div>';_setCont(true);showToast('Telegram session saved');checkReadiness();}catch(e){showToast(e.message,true);b.disabled=false;b.textContent='Submit';}}
 
 // ── Logs ──
 let logLines=[], es=null;
