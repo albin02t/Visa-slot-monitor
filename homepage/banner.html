@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html><head><meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@800;900&family=Space+Grotesk:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  *{margin:0;box-sizing:border-box}
+  body{width:2256px;height:382px;overflow:hidden;background:#0e0b16;position:relative;
+       font-family:'Space Grotesk',sans-serif}
+  .glow{position:absolute;border-radius:50%;filter:blur(120px)}
+  .g1{width:700px;height:700px;background:#ff4fa3;opacity:.42;top:-350px;left:-160px}
+  .g2{width:700px;height:700px;background:#9b5bff;opacity:.4;top:-280px;right:-160px}
+  .g3{width:520px;height:520px;background:#3de8ff;opacity:.22;bottom:-360px;left:44%}
+  .grid{position:absolute;inset:0;
+    background-image:linear-gradient(rgba(255,255,255,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.05) 1px,transparent 1px);
+    background-size:64px 64px;mask-image:radial-gradient(70% 120% at 50% 0%,#000 30%,transparent 85%)}
+  .content{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px}
+  .eyebrow{font-family:'Unbounded';font-weight:800;font-size:19px;letter-spacing:.34em;color:#a6f750;
+    border:2.5px solid #a6f750;border-radius:99px;padding:10px 30px;box-shadow:5px 5px 0 #a6f750}
+  h1{font-family:'Unbounded';font-weight:900;font-size:118px;line-height:1;letter-spacing:-.01em;
+     background:linear-gradient(93deg,#ff4fa3 0%,#ff8a3d 28%,#ffd23f 52%,#a6f750 76%,#3de8ff 100%);
+     -webkit-background-clip:text;background-clip:text;color:transparent}
+  .tag{font-size:33px;font-weight:600;color:#e9e2f7;letter-spacing:.01em}
+  .tag b{color:#3de8ff}
+  .corner{position:absolute;right:56px;bottom:34px;font-size:21px;color:#8f84ad;font-weight:500}
+</style></head>
+<body>
+  <div class="glow g1"></div><div class="glow g2"></div><div class="glow g3"></div>
+  <div class="grid"></div>
+  <div class="content">
+    <div class="eyebrow">🧪 A TINY LAB</div>
+    <h1>TOULE LABS</h1>
+    <div class="tag">We build <b>ridiculously useful</b> little tools</div>
+  </div>
+  <div class="corner">toulelabs.dev</div>
+</body></html>
