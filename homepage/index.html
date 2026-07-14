@@ -99,11 +99,12 @@
   /* founder */
   .founder{display:flex;flex-wrap:wrap;align-items:center;gap:34px;margin-top:36px;border:3px solid #fff;
     border-radius:26px;padding:36px;background:#171226;box-shadow:10px 10px 0 var(--orange)}
-  .avatar{width:110px;height:110px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
-    font-family:'Unbounded';font-weight:900;font-size:40px;color:var(--ink);
+  .avatar{width:118px;height:118px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;
     background:conic-gradient(from 120deg,var(--pink),var(--orange),var(--yellow),var(--lime),var(--cyan),var(--purple),var(--pink));
     border:3px solid #fff;animation:spin 14s linear infinite}
-  .avatar span{animation:spin 14s linear infinite reverse}
+  .avatar span{animation:spin 14s linear infinite reverse;width:100px;height:100px;border-radius:50%;
+    background:#171226;display:flex;align-items:center;justify-content:center;overflow:hidden}
+  .avatar svg{width:88%;height:88%}
   @keyframes spin{to{transform:rotate(360deg)}}
   .founder h3{font-family:'Unbounded';font-weight:800;font-size:24px}
   .founder .role{color:var(--orange);font-weight:700;font-size:14px;letter-spacing:.14em;text-transform:uppercase;margin:4px 0 10px}
@@ -184,7 +185,40 @@
     <p class="sec-kick" style="color:var(--orange)">The human</p>
     <h2 class="sec-title">Founder & chief tinkerer</h2>
     <div class="founder">
-      <div class="avatar"><span>AT</span></div>
+      <div class="avatar"><span><svg viewBox="0 0 100 100" aria-label="funky bored ape avatar">
+        <defs>
+          <linearGradient id="fur" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#9b5bff"/><stop offset="1" stop-color="#ff4fa3"/>
+          </linearGradient>
+        </defs>
+        <!-- ears -->
+        <circle cx="15" cy="55" r="11" fill="url(#fur)"/><circle cx="15" cy="55" r="5" fill="#ff8a3d"/>
+        <circle cx="85" cy="55" r="11" fill="url(#fur)"/><circle cx="85" cy="55" r="5" fill="#ff8a3d"/>
+        <!-- gold earring -->
+        <circle cx="13" cy="64" r="3.4" fill="none" stroke="#ffd23f" stroke-width="2.2"/>
+        <!-- head -->
+        <ellipse cx="50" cy="56" rx="33" ry="34" fill="url(#fur)"/>
+        <!-- face plate -->
+        <path d="M50 34c14 0 22 10 22 24 0 15-9 24-22 24S28 73 28 58c0-14 8-24 22-24z" fill="#cbb8f2"/>
+        <!-- bored half-lidded eyes -->
+        <ellipse cx="40" cy="55" rx="6.4" ry="4.6" fill="#fff"/>
+        <ellipse cx="60" cy="55" rx="6.4" ry="4.6" fill="#fff"/>
+        <circle cx="41.5" cy="56" r="2.3" fill="#0e0b16"/>
+        <circle cx="61.5" cy="56" r="2.3" fill="#0e0b16"/>
+        <path d="M33 52.5h14v-3.6a7 7 0 0 0-14 0z" fill="#cbb8f2"/>
+        <path d="M53 52.5h14v-3.6a7 7 0 0 0-14 0z" fill="#cbb8f2"/>
+        <path d="M33.5 51.5h13" stroke="#0e0b16" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M53.5 51.5h13" stroke="#0e0b16" stroke-width="1.6" stroke-linecap="round"/>
+        <!-- muzzle -->
+        <ellipse cx="50" cy="72" rx="14" ry="9.5" fill="#e9defc"/>
+        <ellipse cx="45.5" cy="69.5" rx="1.7" ry="2.4" fill="#0e0b16"/>
+        <ellipse cx="54.5" cy="69.5" rx="1.7" ry="2.4" fill="#0e0b16"/>
+        <path d="M43 77q7 3.4 14 0" fill="none" stroke="#0e0b16" stroke-width="1.8" stroke-linecap="round"/>
+        <!-- cyan beanie with yellow band -->
+        <path d="M22 40q28-26 56 0l-2-10q-26-20-52 0z" fill="#3de8ff"/>
+        <path d="M21 41q29-24 58 0l-1-5q-28-22-56 0z" fill="#ffd23f"/>
+        <circle cx="50" cy="17" r="4.6" fill="#ff4fa3"/>
+      </svg></span></div>
       <div>
         <h3>Albin Thomas</h3>
         <div class="role">Founder, Toule Labs</div>
