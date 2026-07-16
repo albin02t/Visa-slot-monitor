@@ -81,7 +81,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 2. **Setup wizard**:
    - *Telegram* — API ID/hash from [my.telegram.org/apps](https://my.telegram.org/apps), channels to watch, then in-browser phone/OTP login (2FA supported).
    - *Alerts* — one tap opens the bot in Telegram; press **Start**; done.
-   - *checkvisaslots.com* — API key, locations, poll interval.
+   - *checkvisaslots.com* — access code, locations, poll interval.
 3. **Save** — the monitor starts automatically once everything is linked (readiness checklist shows progress).
 4. **Dashboard** — live alerts, poll history, channel activity, and streaming logs.
 

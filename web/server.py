@@ -22,7 +22,10 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from starlette.middleware.sessions import SessionMiddleware
 from telethon import TelegramClient
-from telethon.errors import SessionPasswordNeededError
+from telethon.errors import (
+    ApiIdInvalidError, FloodWaitError, PasswordHashInvalidError,
+    PhoneCodeExpiredError, PhoneCodeInvalidError, PhoneNumberInvalidError,
+    SessionPasswordNeededError)
 
 from web import auth, mailer, tgbot
 from web.db import Alert, CvsCheck, Session, TgEvent, User, init_db
@@ -536,8 +539,25 @@ async def tg_send_code(payload: TgPhonePayload, user: User = Depends(current_use
         except Exception:
             pass
     client = TelegramClient(_tg_session_path(user.id), api_id, api_hash)
-    await client.connect()
-    result = await client.send_code_request(payload.phone)
+    try:
+        await client.connect()
+        result = await client.send_code_request(payload.phone)
+    except PhoneNumberInvalidError:
+        await client.disconnect()
+        raise HTTPException(status_code=400, detail=(
+            "That phone number looks invalid — use international format with your "
+            "full number, e.g. +919876543210 (no spaces)."))
+    except ApiIdInvalidError:
+        await client.disconnect()
+        raise HTTPException(status_code=400, detail=(
+            "Telegram rejected your API ID / API Hash — re-check them at my.telegram.org/apps."))
+    except FloodWaitError as e:
+        await client.disconnect()
+        raise HTTPException(status_code=400, detail=(
+            f"Telegram rate limit hit — wait {e.seconds // 60 + 1} minutes and try again."))
+    except Exception as e:
+        await client.disconnect()
+        raise HTTPException(status_code=400, detail=f"Telegram error: {e}")
     _tg_pending[user.id] = {"client": client, "phone": payload.phone,
                             "phone_code_hash": result.phone_code_hash}
     return {"sent": True}
@@ -557,8 +577,12 @@ async def tg_verify(payload: TgCodePayload, user: User = Depends(current_user)):
         return {"authorized": True}
     except SessionPasswordNeededError:
         return {"needs_2fa": True}
+    except PhoneCodeInvalidError:
+        raise HTTPException(status_code=400, detail="Wrong code — check the OTP and try again.")
+    except PhoneCodeExpiredError:
+        raise HTTPException(status_code=400, detail="That code expired — go back and send a new OTP.")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Telegram error: {e}")
 
 
 @app.post("/api/telegram/2fa")
@@ -572,8 +596,10 @@ async def tg_2fa(payload: Tg2FAPayload, user: User = Depends(current_user)):
         del _tg_pending[user.id]
         await _ensure_running(user.id, user.config or {})
         return {"authorized": True}
+    except PasswordHashInvalidError:
+        raise HTTPException(status_code=400, detail="Wrong 2FA password — try again.")
     except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail=f"Telegram error: {e}")
 
 
 # Serve frontend — must be last
