@@ -6,6 +6,7 @@ delivered through a shared Telegram bot (see web/tgbot.py).
 """
 import asyncio
 import json
+import logging
 import os
 import re
 import sys
@@ -226,12 +227,41 @@ async def _resume_all() -> None:
         pass
 
 
+async def _invite_from_waitlist() -> None:
+    """If seats are free (typically because MAX_USERS was raised), invite
+    waitlist members in join order: email them an access-granted invitation
+    and remove them from the queue. Runs once per app startup — raising
+    MAX_USERS always involves a restart, so this fires exactly when needed.
+    Members whose email fails to send stay queued and are retried next boot."""
+    from sqlalchemy import func as safunc
+    log = logging.getLogger("waitlist")
+    await asyncio.sleep(2)
+    try:
+        async with Session() as s:
+            users = (await s.execute(select(safunc.count(User.id)))).scalar_one()
+            free = MAX_USERS - users
+            if free <= 0:
+                return
+            rows = (await s.execute(
+                select(Waitlist).order_by(Waitlist.id).limit(free))).scalars().all()
+            for row in rows:
+                if await asyncio.to_thread(mailer.send_access_email, row.email):
+                    log.info("Invited %s off the waitlist", row.email)
+                    await s.delete(row)
+                else:
+                    log.warning("Could not email %s — kept on waitlist", row.email)
+            await s.commit()
+    except Exception as e:
+        log.error("Waitlist invite pass failed: %s", e)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     USER_DATA_ROOT.mkdir(parents=True, exist_ok=True)
     await init_db()
     asyncio.create_task(_resume_all())
     asyncio.create_task(tgbot.poll_updates())
+    asyncio.create_task(_invite_from_waitlist())
     yield
     # Graceful shutdown — terminate all user subprocesses.
     for procs in processes.values():
@@ -295,7 +325,7 @@ async def join_waitlist(payload: WaitlistPayload):
 # Admin: waitlist management (grant access + fancy notification email)
 # ---------------------------------------------------------------------------
 ADMIN_EMAILS = {e.strip().lower() for e in
-                os.environ.get("ADMIN_EMAILS", "albinthomaa@gmail.com").split(",") if e.strip()}
+                os.environ.get("ADMIN_EMAILS", "toulelabs@gmail.com").split(",") if e.strip()}
 
 
 async def admin_user(request: Request) -> User:
