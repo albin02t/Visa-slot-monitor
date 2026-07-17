@@ -174,12 +174,65 @@ def send_nudge_email(to: str, name: str | None) -> bool:
 
 
 def send_welcome(to: str, name: str | None) -> None:
-    send_email(
-        to,
-        "Welcome to Visa Slot Monitor",
-        f"Hi {name or 'there'},\n\n"
-        "Your Visa Slot Monitor account is ready. Sign in, complete the setup wizard "
-        "(Telegram, checkvisaslots.com, alerts), and your monitor will begin "
-        "sending you Telegram alerts the moment visa interview slots open.\n\n"
-        "— Visa Slot Monitor",
+    """First-signup welcome — same visual family as send_access_email, with a
+    cyan accent (green = access granted, amber = nudge, cyan = welcome)."""
+    app_url = os.environ.get("PUBLIC_BASE_URL", "https://slots.toulelabs.dev")
+    first = (name or "there").split(" ")[0]
+    text = (
+        f"Hi {first},\n\n"
+        "Your Visa Slot Monitor account is ready. Sign in, complete the 5-minute "
+        f"setup wizard (Telegram, checkvisaslots.com, alerts): {app_url}\n\n"
+        "Once done, your radar scans checkvisaslots.com and Telegram channels "
+        "24/7 and pings your Telegram the moment F1 visa interview slots open.\n\n"
+        "— Toule Labs · Visa Slot Monitor"
     )
+    html = f"""\
+<div style="margin:0;padding:0;background-color:#070d10;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#070d10" style="background-color:#070d10;">
+  <tr><td align="center" style="padding:40px 16px;">
+    <table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;width:100%;">
+      <!-- header badge -->
+      <tr><td align="center" style="padding-bottom:24px;">
+        <span style="display:inline-block;padding:8px 18px;border:1px solid #1b3a45;border-radius:999px;
+                     font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:3px;color:#22d3ee;">
+          &#128225;&nbsp; TOULE LABS &middot; WELCOME ABOARD
+        </span>
+      </td></tr>
+      <!-- card -->
+      <tr><td style="background-color:#0a161c;border:1px solid #1b3a45;border-radius:20px;padding:44px 36px;" align="center">
+        <p style="margin:0;font-family:'Courier New',monospace;font-size:13px;letter-spacing:4px;color:#22d3ee;">
+          &gt;&gt; SIGNAL ACQUIRED &lt;&lt;
+        </p>
+        <h1 style="margin:18px 0 0;font-family:Arial,Helvetica,sans-serif;font-weight:800;font-size:34px;line-height:1.15;color:#f0fbff;">
+          {first}, your radar<br>
+          <span style="color:#22d3ee;">is on the grid</span>
+        </h1>
+        <p style="margin:20px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#8fb0bc;">
+          Your account is ready. One 5-minute setup &mdash; Telegram login, alert
+          link, slot data &mdash; and your radar starts scanning checkvisaslots.com
+          and Telegram channels around the clock, pinging your Telegram the moment
+          F1 visa slots open.
+        </p>
+        <!-- CTA -->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:32px auto 0;">
+          <tr><td align="center" bgcolor="#22d3ee" style="border-radius:14px;">
+            <a href="{app_url}" style="display:inline-block;padding:15px 34px;font-family:Arial,Helvetica,sans-serif;
+               font-size:16px;font-weight:bold;color:#062a33;text-decoration:none;">
+              Start setup &nbsp;&rarr;
+            </a>
+          </td></tr>
+        </table>
+        <p style="margin:26px 0 0;font-family:'Courier New',monospace;font-size:12px;letter-spacing:2px;color:#39606e;">
+          FREE &middot; 5-MIN SETUP &middot; ALERTS ON TELEGRAM
+        </p>
+      </td></tr>
+      <!-- footer -->
+      <tr><td align="center" style="padding-top:26px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#39606e;">
+        Toule Labs &middot; tiny lab, ridiculously useful tools<br>
+        <a href="https://toulelabs.dev" style="color:#22d3ee;text-decoration:none;">toulelabs.dev</a>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</div>"""
+    send_email(to, "📡 Welcome aboard — your slot radar awaits", text, html=html)
