@@ -769,4 +769,13 @@ async def tg_2fa(payload: Tg2FAPayload, user: User = Depends(current_user)):
 
 
 # Serve frontend — must be last
-app.mount("/", StaticFiles(directory=str(Path(__file__).parent / "static"), html=True), name="static")
+class _NoCacheStaticFiles(StaticFiles):
+    """Force browsers to revalidate the SPA on every load — a stale cached
+    index.html means users run old JS against the current API."""
+    def file_response(self, *args, **kwargs):
+        resp = super().file_response(*args, **kwargs)
+        resp.headers["Cache-Control"] = "no-cache"
+        return resp
+
+
+app.mount("/", _NoCacheStaticFiles(directory=str(Path(__file__).parent / "static"), html=True), name="static")

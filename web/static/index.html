@@ -657,7 +657,12 @@ async function checkReadiness(){
   ];
   const done=checks.filter(c=>c[0]).length, pct=Math.round(done/checks.length*100);
   if($('ready-pct')){$('ready-pct').textContent=pct+'%';$('ready-bar').style.width=pct+'%';}
-  if(done===checks.length&&!localStorage.getItem(CELEB_KEY)){localStorage.setItem(CELEB_KEY,'1');celebrate();showToast('🛰️ All systems go — your radar is live!');}
+  if(done===checks.length&&!localStorage.getItem(CELEB_KEY)){
+    localStorage.setItem(CELEB_KEY,'1');
+    // Land the user on the Radar page first, then play the launch board over it.
+    gotoPage('dashboard');refreshDash();
+    setTimeout(()=>{celebrate();showToast('🛰️ All systems go — your radar is live!');},450);
+  }
   if(!el) return;
   const item=(ok,label,hint)=>`<div class="flex items-start gap-3 py-2"><span class="text-[15.5px] leading-5" style="color:${ok?'#4ade80':'var(--txt-3)'}">${ok?'✓':'○'}</span><div class="flex-1"><p class="text-[14px] font-medium" style="color:var(--txt-2)">${label}</p>${!ok&&hint?`<p class="text-[13px] mt-0.5" style="color:var(--warn);opacity:.85">${hint}</p>`:''}</div></div>`;
   el.innerHTML=`<div class="card-sm p-5"><div class="flex items-center justify-between mb-2"><p class="text-[14px] font-bold display" style="color:var(--txt)">Pre-flight checks</p><span class="badge ${done===4?'badge-green':'badge-gray'}">${done}/4</span></div>
