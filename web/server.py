@@ -291,6 +291,53 @@ async def join_waitlist(payload: WaitlistPayload):
     return {"ok": True, "position": position, "already": not is_new}
 
 
+# ---------------------------------------------------------------------------
+# Admin: waitlist management (grant access + fancy notification email)
+# ---------------------------------------------------------------------------
+ADMIN_EMAILS = {e.strip().lower() for e in
+                os.environ.get("ADMIN_EMAILS", "albinthomaa@gmail.com").split(",") if e.strip()}
+
+
+async def admin_user(request: Request) -> User:
+    user = await auth.get_user_from_request(request)
+    if user is None or user.email.lower() not in ADMIN_EMAILS:
+        raise HTTPException(status_code=403, detail="Admins only")
+    return user
+
+
+@app.get("/api/admin/waitlist")
+async def admin_waitlist(user: User = Depends(admin_user)):
+    async with Session() as s:
+        rows = (await s.execute(select(Waitlist).order_by(Waitlist.id))).scalars().all()
+    return {"count": len(rows),
+            "entries": [{"email": w.email, "joined": w.created_at.isoformat()} for w in rows]}
+
+
+class InvitePayload(BaseModel):
+    email: str | None = None  # omit to invite whoever is first in line
+
+
+@app.post("/api/admin/invite")
+async def admin_invite(payload: InvitePayload, user: User = Depends(admin_user)):
+    """Remove someone from the waitlist and send them the access-granted email.
+    Make sure a seat actually exists (MAX_USERS > current users) first."""
+    async with Session() as s:
+        if payload.email:
+            row = (await s.execute(select(Waitlist).where(
+                Waitlist.email == payload.email.strip().lower()))).scalar_one_or_none()
+            if row is None:
+                raise HTTPException(status_code=404, detail="That email isn't on the waitlist.")
+        else:
+            row = (await s.execute(select(Waitlist).order_by(Waitlist.id).limit(1))).scalar_one_or_none()
+            if row is None:
+                raise HTTPException(status_code=404, detail="The waitlist is empty.")
+        email = row.email
+        await s.delete(row)
+        await s.commit()
+    sent = await asyncio.to_thread(mailer.send_access_email, email)
+    return {"ok": True, "email": email, "email_sent": sent}
+
+
 @app.get("/api/public-stats")
 async def public_stats():
     """Aggregate, non-sensitive metrics for the toulelabs.dev homepage."""
