@@ -28,7 +28,7 @@ from telethon.errors import (
     SessionPasswordNeededError)
 
 from web import auth, mailer, tgbot
-from web.db import Alert, CvsCheck, Session, TgEvent, User, init_db
+from web.db import Alert, CvsCheck, Session, TgEvent, User, Waitlist, init_db
 
 BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = Path(os.environ.get("DATA_DIR", str(BASE_DIR)))
@@ -249,6 +249,46 @@ app = FastAPI(title="Visa Slot Monitor", lifespan=lifespan)
 @app.get("/healthz")
 async def healthz():
     return {"ok": True}
+
+
+class WaitlistPayload(BaseModel):
+    email: str
+
+
+@app.post("/api/waitlist")
+async def join_waitlist(payload: WaitlistPayload):
+    """Join the signup queue shown when the instance is at capacity. No auth —
+    callers are by definition people who couldn't create an account."""
+    email = payload.email.strip().lower()
+    if len(email) > 320 or not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", email):
+        raise HTTPException(status_code=400, detail="That doesn't look like a valid email address.")
+    from sqlalchemy import func as safunc
+    async with Session() as s:
+        existing = (await s.execute(
+            select(Waitlist).where(Waitlist.email == email))).scalar_one_or_none()
+        is_new = existing is None
+        if is_new:
+            s.add(Waitlist(email=email))
+            await s.commit()
+        count = (await s.execute(select(safunc.count(Waitlist.id)))).scalar_one()
+        if not is_new:
+            # position = how many joined up to and including them
+            position = (await s.execute(
+                select(safunc.count(Waitlist.id)).where(Waitlist.id <= existing.id))).scalar_one()
+        else:
+            position = count
+    if is_new:
+        admin = os.environ.get("SMTP_USER", "")
+        if admin:
+            try:
+                await asyncio.to_thread(
+                    mailer.send_email, admin,
+                    f"Visa Slot Monitor waitlist: {email}",
+                    f"{email} joined the waitlist ({count} waiting). "
+                    f"Raise MAX_USERS or free a slot, then let them know.")
+            except Exception:
+                pass
+    return {"ok": True, "position": position, "already": not is_new}
 
 
 @app.get("/api/public-stats")

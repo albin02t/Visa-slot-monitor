@@ -80,6 +80,14 @@ class TgEvent(Base):
     verdict: Mapped[str] = mapped_column(String(16), default="pending", server_default="pending")
 
 
+class Waitlist(Base):
+    __tablename__ = "waitlist"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 async def init_db(retries: int = 30, delay: float = 2.0) -> None:
     """Create tables, waiting for Postgres to become reachable on startup."""
     import asyncio

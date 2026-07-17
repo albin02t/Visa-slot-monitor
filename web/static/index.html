@@ -198,6 +198,29 @@
                 Google OAuth isn't configured. Set GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET, or enable ALLOW_DEV_LOGIN=1 for local testing.
               </p>
               <p id="login-err" class="hidden text-[14px]" style="color:var(--err)"></p>
+
+              <!-- waitlist card — revealed when signups are at capacity (?error=full) -->
+              <div id="waitlist-card" class="hidden w-full max-w-sm rounded-2xl p-5 text-left"
+                   style="background:var(--card);border:1px solid var(--line)">
+                <p class="h-display text-[15px] tracking-wide" style="color:var(--txt)">Join the line</p>
+                <p class="mt-1 text-[14px]" style="color:var(--txt-2)">
+                  Leave your email and we'll ping you the moment a spot opens.
+                </p>
+                <form id="waitlist-form" class="mt-3 flex gap-2" onsubmit="joinWaitlist(event)">
+                  <input id="wl-email" type="email" required placeholder="you@example.com"
+                         class="flex-1 min-w-0 rounded-xl px-3 py-2.5 text-[14px] outline-none"
+                         style="background:var(--bg);border:1px solid var(--line);color:var(--txt)">
+                  <button id="wl-btn" type="submit" class="rounded-xl px-4 py-2.5 text-[14px] font-semibold"
+                          style="background:#4ade80;color:#052e16">Join</button>
+                </form>
+                <p id="wl-msg" class="hidden mt-3 text-[14px]"></p>
+                <p class="mt-3 text-[13px]" style="color:var(--txt-3)">
+                  In a hurry? Email
+                  <a href="mailto:toulelabs@gmail.com?subject=Visa%20Slot%20Monitor%20access%20request"
+                     class="underline" style="color:var(--txt-2)">toulelabs@gmail.com</a>
+                  to request access.
+                </p>
+              </div>
             </div>
           </div>
 
@@ -517,7 +540,7 @@ function showApp(){$('landing').classList.add('hidden');$('app').classList.remov
 
 async function initAuth(){
   const params = new URLSearchParams(location.search);
-  if(params.get('error')){ const errs={not_allowed:'This account isn\'t approved for access. Contact the administrator.',no_userinfo:'Could not read your Google profile. Try again.',full:'We\'re at capacity right now — signups are temporarily closed. Check back soon!'}; showLanding(); $('login-err').textContent=errs[params.get('error')]||('Sign-in failed: '+params.get('error')); $('login-err').classList.remove('hidden'); history.replaceState({},'', '/'); }
+  if(params.get('error')){ const errs={not_allowed:'This account isn\'t approved for access. Contact the administrator.',no_userinfo:'Could not read your Google profile. Try again.',full:'We\'re at capacity right now — join the waitlist below and we\'ll email you when a spot opens.'}; showLanding(); $('login-err').textContent=errs[params.get('error')]||('Sign-in failed: '+params.get('error')); $('login-err').classList.remove('hidden'); if(params.get('error')==='full'){ $('waitlist-card').classList.remove('hidden'); } history.replaceState({},'', '/'); }
   let me=null;
   try { me = await api('/api/auth/me'); } catch {}
   if(me){ applyUser(me); showApp(); boot(); return; }
@@ -537,6 +560,21 @@ function applyUser(me){
 }
 
 async function devLogin(){ try{ await api('/api/auth/dev-login',{method:'POST'}); location.reload(); }catch(e){ showToast(e.message,true); } }
+async function joinWaitlist(ev){
+  ev.preventDefault();
+  const btn=$('wl-btn'), msg=$('wl-msg');
+  btn.disabled=true; btn.textContent='…';
+  try{
+    const r=await api('/api/waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('wl-email').value})});
+    msg.style.color='#4ade80';
+    msg.textContent=r.already?`You're already on the list — #${r.position} in line.`:`You're in! #${r.position} in line — we'll email you when a spot opens.`;
+    $('waitlist-form').classList.add('hidden');
+  }catch(e){
+    msg.style.color='var(--err)'; msg.textContent=e.message;
+    btn.disabled=false; btn.textContent='Join';
+  }
+  msg.classList.remove('hidden');
+}
 async function logout(){ try{ await api('/api/auth/logout',{method:'POST'}); }catch{} showLanding(); }
 
 // ── Nav ──
