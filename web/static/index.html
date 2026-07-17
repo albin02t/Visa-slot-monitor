@@ -551,7 +551,11 @@ async function initAuth(){
 }
 
 const AVATAR_FALLBACK='data:image/svg+xml,'+encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="#4ade80"><circle cx="12" cy="8" r="4"/><path d="M4 20c0-4 4-6 8-6s8 2 8 6"/></svg>');
+// Celebration flag is per-account, not per-browser — otherwise a returning or
+// re-created account never sees the launch moment again.
+let CELEB_KEY='vsm_celebrated';
 function applyUser(me){
+  CELEB_KEY='vsm_celebrated:'+(me.email||'');
   $('user-name').textContent = me.name || 'User';
   $('user-email').textContent = me.email || '';
   const av=$('user-avatar');
@@ -615,7 +619,7 @@ async function refreshDash(){
     }
     _lastAl=al.length;_lastEventTotal=total;
 
-    if(st.monitor&&st.alerts_linked&&!localStorage.getItem('vsm_celebrated'))checkReadiness();
+    if(st.monitor&&st.alerts_linked&&!localStorage.getItem(CELEB_KEY))checkReadiness();
     setNum('s-alerts',al.length);setNum('s-cvs',cvs.length);setNum('s-tg',tg.length);
     const rem=cvs.find(c=>c.api_remaining)?.api_remaining;
     if(rem!==undefined&&rem!==null&&rem!=='?')setNum('s-remaining',rem);else $('s-remaining').textContent='—';
@@ -653,7 +657,7 @@ async function checkReadiness(){
   ];
   const done=checks.filter(c=>c[0]).length, pct=Math.round(done/checks.length*100);
   if($('ready-pct')){$('ready-pct').textContent=pct+'%';$('ready-bar').style.width=pct+'%';}
-  if(done===checks.length&&!localStorage.getItem('vsm_celebrated')){localStorage.setItem('vsm_celebrated','1');celebrate();showToast('🛰️ All systems go — your radar is live!');}
+  if(done===checks.length&&!localStorage.getItem(CELEB_KEY)){localStorage.setItem(CELEB_KEY,'1');celebrate();showToast('🛰️ All systems go — your radar is live!');}
   if(!el) return;
   const item=(ok,label,hint)=>`<div class="flex items-start gap-3 py-2"><span class="text-[15.5px] leading-5" style="color:${ok?'#4ade80':'var(--txt-3)'}">${ok?'✓':'○'}</span><div class="flex-1"><p class="text-[14px] font-medium" style="color:var(--txt-2)">${label}</p>${!ok&&hint?`<p class="text-[13px] mt-0.5" style="color:var(--warn);opacity:.85">${hint}</p>`:''}</div></div>`;
   el.innerHTML=`<div class="card-sm p-5"><div class="flex items-center justify-between mb-2"><p class="text-[14px] font-bold display" style="color:var(--txt)">Pre-flight checks</p><span class="badge ${done===4?'badge-green':'badge-gray'}">${done}/4</span></div>
