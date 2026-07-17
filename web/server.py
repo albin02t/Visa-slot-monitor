@@ -239,15 +239,19 @@ async def _invite_from_waitlist() -> None:
     try:
         async with Session() as s:
             users = (await s.execute(select(safunc.count(User.id)))).scalar_one()
-            free = MAX_USERS - users
+            signed_up = {e.lower() for (e,) in (await s.execute(select(User.email)))}
+            # Seats already promised: invited people who haven't signed up yet.
+            pending = [w for w in (await s.execute(select(Waitlist).where(
+                Waitlist.invited_at.is_not(None)))).scalars() if w.email not in signed_up]
+            free = MAX_USERS - users - len(pending)
             if free <= 0:
                 return
-            rows = (await s.execute(
-                select(Waitlist).order_by(Waitlist.id).limit(free))).scalars().all()
+            rows = (await s.execute(select(Waitlist).where(
+                Waitlist.invited_at.is_(None)).order_by(Waitlist.id).limit(free))).scalars().all()
             for row in rows:
                 if await asyncio.to_thread(mailer.send_access_email, row.email):
                     log.info("Invited %s off the waitlist", row.email)
-                    await s.delete(row)
+                    row.invited_at = datetime.now(timezone.utc)
                 else:
                     log.warning("Could not email %s — kept on waitlist", row.email)
             await s.commit()
@@ -329,15 +333,19 @@ async def join_waitlist(payload: WaitlistPayload):
     async with Session() as s:
         existing = (await s.execute(
             select(Waitlist).where(Waitlist.email == email))).scalar_one_or_none()
+        if existing is not None and existing.invited_at is not None:
+            return {"ok": True, "position": 0, "already": True, "invited": True}
         is_new = existing is None
         if is_new:
             s.add(Waitlist(email=email))
             await s.commit()
-        count = (await s.execute(select(safunc.count(Waitlist.id)))).scalar_one()
+        # Position counts only people still waiting (not yet invited).
+        count = (await s.execute(select(safunc.count(Waitlist.id)).where(
+            Waitlist.invited_at.is_(None)))).scalar_one()
         if not is_new:
-            # position = how many joined up to and including them
             position = (await s.execute(
-                select(safunc.count(Waitlist.id)).where(Waitlist.id <= existing.id))).scalar_one()
+                select(safunc.count(Waitlist.id)).where(
+                    Waitlist.invited_at.is_(None), Waitlist.id <= existing.id))).scalar_one()
         else:
             position = count
     if is_new:
@@ -372,8 +380,14 @@ async def admin_user(request: Request) -> User:
 async def admin_waitlist(user: User = Depends(admin_user)):
     async with Session() as s:
         rows = (await s.execute(select(Waitlist).order_by(Waitlist.id))).scalars().all()
-    return {"count": len(rows),
-            "entries": [{"email": w.email, "joined": w.created_at.isoformat()} for w in rows]}
+        signed_up = {e.lower() for (e,) in (await s.execute(select(User.email)))}
+    return {"count": len(rows), "entries": [{
+        "email": w.email,
+        "joined": w.created_at.isoformat(),
+        "invited": w.invited_at.isoformat() if w.invited_at else None,
+        "status": ("signed up" if w.email in signed_up
+                   else "invited" if w.invited_at else "waiting"),
+    } for w in rows]}
 
 
 class InvitePayload(BaseModel):
@@ -391,13 +405,15 @@ async def admin_invite(payload: InvitePayload, user: User = Depends(admin_user))
             if row is None:
                 raise HTTPException(status_code=404, detail="That email isn't on the waitlist.")
         else:
-            row = (await s.execute(select(Waitlist).order_by(Waitlist.id).limit(1))).scalar_one_or_none()
+            row = (await s.execute(select(Waitlist).where(
+                Waitlist.invited_at.is_(None)).order_by(Waitlist.id).limit(1))).scalar_one_or_none()
             if row is None:
-                raise HTTPException(status_code=404, detail="The waitlist is empty.")
+                raise HTTPException(status_code=404, detail="No one is waiting to be invited.")
         email = row.email
-        await s.delete(row)
-        await s.commit()
-    sent = await asyncio.to_thread(mailer.send_access_email, email)
+        sent = await asyncio.to_thread(mailer.send_access_email, email)
+        if sent:
+            row.invited_at = datetime.now(timezone.utc)
+            await s.commit()
     return {"ok": True, "email": email, "email_sent": sent}
 
 

@@ -87,6 +87,10 @@ class Waitlist(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     email: Mapped[str] = mapped_column(String(320), unique=True, index=True)
+    # When the access-granted invitation email was sent (NULL = still waiting).
+    # Rows are kept after inviting so the full lifecycle stays auditable:
+    # waiting -> invited -> signed up (joined against users by email).
+    invited_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -108,6 +112,8 @@ async def init_db(retries: int = 30, delay: float = 2.0) -> None:
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS alert_chat_id VARCHAR(32)"))
                 await conn.execute(text(
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMPTZ"))
+                await conn.execute(text(
+                    "ALTER TABLE waitlist ADD COLUMN IF NOT EXISTS invited_at TIMESTAMPTZ"))
             log.info("Database ready (attempt %d)", attempt)
             return
         except Exception as e:  # noqa: BLE001 — DNS/connection not ready yet

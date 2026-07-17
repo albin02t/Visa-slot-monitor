@@ -567,7 +567,7 @@ async function joinWaitlist(ev){
   try{
     const r=await api('/api/waitlist',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('wl-email').value})});
     msg.style.color='#4ade80';
-    msg.textContent=r.already?`You're already on the list — #${r.position} in line.`:`You're in! #${r.position} in line — we'll email you when a spot opens.`;
+    msg.textContent=r.invited?'You\'ve already been invited — check your email for the access link!':r.already?`You're already on the list — #${r.position} in line.`:`You're in! #${r.position} in line — we'll email you when a spot opens.`;
     $('waitlist-form').classList.add('hidden');
   }catch(e){
     msg.style.color='var(--err)'; msg.textContent=e.message;
