@@ -108,6 +108,71 @@ def send_access_email(to: str) -> bool:
     return send_email(to, "📡 Access granted — your slot radar is ready", text, html=html)
 
 
+def send_nudge_email(to: str, name: str | None) -> bool:
+    """One-time 'finish your setup' reminder for users who signed up but never
+    completed the wizard. Same visual family as send_access_email."""
+    app_url = os.environ.get("PUBLIC_BASE_URL", "https://slots.toulelabs.dev")
+    first = (name or "there").split(" ")[0]
+    text = (
+        f"Hi {first},\n\n"
+        "You created your Visa Slot Monitor account, but your radar is still "
+        "offline — the setup isn't finished, so no alerts are going out yet.\n\n"
+        f"It takes about 5 minutes to complete: {app_url}\n\n"
+        "Once done, your radar scans checkvisaslots.com and Telegram channels "
+        "24/7 and pings your Telegram the instant F1 visa slots open.\n\n"
+        "— Toule Labs · Visa Slot Monitor"
+    )
+    html = f"""\
+<div style="margin:0;padding:0;background-color:#100d07;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#100d07" style="background-color:#100d07;">
+  <tr><td align="center" style="padding:40px 16px;">
+    <table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;width:100%;">
+      <!-- header badge -->
+      <tr><td align="center" style="padding-bottom:24px;">
+        <span style="display:inline-block;padding:8px 18px;border:1px solid #45391b;border-radius:999px;
+                     font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:3px;color:#fbbf24;">
+          &#128225;&nbsp; TOULE LABS &middot; STATUS CHECK
+        </span>
+      </td></tr>
+      <!-- card -->
+      <tr><td style="background-color:#191309;border:1px solid #45391b;border-radius:20px;padding:44px 36px;" align="center">
+        <p style="margin:0;font-family:'Courier New',monospace;font-size:13px;letter-spacing:4px;color:#fbbf24;">
+          &gt;&gt; RADAR OFFLINE &lt;&lt;
+        </p>
+        <h1 style="margin:18px 0 0;font-family:Arial,Helvetica,sans-serif;font-weight:800;font-size:34px;line-height:1.15;color:#fffbf0;">
+          {first}, you're one step<br>
+          <span style="color:#fbbf24;">from going live</span>
+        </h1>
+        <p style="margin:20px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#b8ab8d;">
+          Your account exists, but the setup wizard isn't finished &mdash; so your
+          radar isn't scanning and no alerts are going out. Five more minutes and
+          it hunts F1 visa slots for you around the clock.
+        </p>
+        <!-- CTA -->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:32px auto 0;">
+          <tr><td align="center" bgcolor="#fbbf24" style="border-radius:14px;">
+            <a href="{app_url}" style="display:inline-block;padding:15px 34px;font-family:Arial,Helvetica,sans-serif;
+               font-size:16px;font-weight:bold;color:#3b2a03;text-decoration:none;">
+              Finish setup &nbsp;&rarr;
+            </a>
+          </td></tr>
+        </table>
+        <p style="margin:26px 0 0;font-family:'Courier New',monospace;font-size:12px;letter-spacing:2px;color:#6b5c39;">
+          TELEGRAM LOGIN &middot; ALERT LINK &middot; SLOT DATA &middot; LAUNCH
+        </p>
+      </td></tr>
+      <!-- footer -->
+      <tr><td align="center" style="padding-top:26px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#6b5c39;">
+        Toule Labs &middot; tiny lab, ridiculously useful tools<br>
+        <a href="https://toulelabs.dev" style="color:#fbbf24;text-decoration:none;">toulelabs.dev</a>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</div>"""
+    return send_email(to, "📡 Your slot radar is still offline — 5 minutes to launch", text, html=html)
+
+
 def send_welcome(to: str, name: str | None) -> None:
     send_email(
         to,

@@ -12,7 +12,7 @@ import re
 import sys
 from collections import defaultdict
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from authlib.integrations.starlette_client import OAuthError
@@ -255,6 +255,38 @@ async def _invite_from_waitlist() -> None:
         log.error("Waitlist invite pass failed: %s", e)
 
 
+def _setup_complete(u: User) -> bool:
+    """Proxy for 'this user finished the wizard': alert bot linked and all
+    required monitor config present. (Telegram session validity is checked
+    lazily elsewhere — too heavy to probe for every user here.)"""
+    cfg = u.config or {}
+    present = {k for k, v in cfg.items() if v}
+    return bool(u.alert_chat_id) and REQUIRED_MONITOR_KEYS.issubset(present)
+
+
+async def _nudge_loop() -> None:
+    """Every 6h, send a one-time 'finish your setup' email to users who signed
+    up over 24h ago and still haven't completed the wizard."""
+    log = logging.getLogger("nudge")
+    await asyncio.sleep(30)  # let startup settle
+    while True:
+        try:
+            cutoff = datetime.now(timezone.utc) - timedelta(hours=24)
+            async with Session() as s:
+                users = (await s.execute(select(User).where(
+                    User.nudged_at.is_(None), User.created_at < cutoff))).scalars().all()
+                for u in users:
+                    if _setup_complete(u):
+                        continue
+                    if await asyncio.to_thread(mailer.send_nudge_email, u.email, u.name):
+                        u.nudged_at = datetime.now(timezone.utc)
+                        log.info("Nudged %s to finish setup", u.email)
+                await s.commit()
+        except Exception as e:
+            log.error("Nudge pass failed: %s", e)
+        await asyncio.sleep(6 * 3600)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     USER_DATA_ROOT.mkdir(parents=True, exist_ok=True)
@@ -262,6 +294,7 @@ async def lifespan(app: FastAPI):
     asyncio.create_task(_resume_all())
     asyncio.create_task(tgbot.poll_updates())
     asyncio.create_task(_invite_from_waitlist())
+    asyncio.create_task(_nudge_loop())
     yield
     # Graceful shutdown — terminate all user subprocesses.
     for procs in processes.values():

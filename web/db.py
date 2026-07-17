@@ -45,6 +45,8 @@ class User(Base):
     config: Mapped[dict] = mapped_column(JSONB, default=dict, server_default="{}")
     # Telegram chat id the alert bot delivers to (set via the bot /start link flow)
     alert_chat_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    # When the one-time "finish your setup" nudge email was sent (NULL = never)
+    nudged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
@@ -104,6 +106,8 @@ async def init_db(retries: int = 30, delay: float = 2.0) -> None:
                 from sqlalchemy import text
                 await conn.execute(text(
                     "ALTER TABLE users ADD COLUMN IF NOT EXISTS alert_chat_id VARCHAR(32)"))
+                await conn.execute(text(
+                    "ALTER TABLE users ADD COLUMN IF NOT EXISTS nudged_at TIMESTAMPTZ"))
             log.info("Database ready (attempt %d)", attempt)
             return
         except Exception as e:  # noqa: BLE001 — DNS/connection not ready yet
