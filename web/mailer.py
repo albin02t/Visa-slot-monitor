@@ -170,7 +170,9 @@ def send_nudge_email(to: str, name: str | None) -> bool:
   </td></tr>
 </table>
 </div>"""
-    return send_email(to, "📡 Your slot radar is still offline — 5 minutes to launch", text, html=html)
+    subject = (f"📡 {first}, your slot radar is still offline — 5 minutes to launch"
+               if first != "there" else "📡 Your slot radar is still offline — 5 minutes to launch")
+    return send_email(to, subject, text, html=html)
 
 
 def send_welcome(to: str, name: str | None) -> None:
@@ -235,4 +237,6 @@ def send_welcome(to: str, name: str | None) -> None:
   </td></tr>
 </table>
 </div>"""
-    send_email(to, "📡 Welcome aboard — your slot radar awaits", text, html=html)
+    subject = (f"📡 {first}, welcome aboard — your slot radar awaits"
+               if first != "there" else "📡 Welcome aboard — your slot radar awaits")
+    send_email(to, subject, text, html=html)
