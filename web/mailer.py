@@ -175,6 +175,79 @@ def send_nudge_email(to: str, name: str | None) -> bool:
     return send_email(to, subject, text, html=html)
 
 
+def send_setup_update(to: str, name: str | None) -> bool:
+    """Product-update email: the Telegram credentials step was rebuilt with a
+    guided walkthrough. Violet accent (cyan welcome / amber nudge / green access)."""
+    app_url = os.environ.get("PUBLIC_BASE_URL", "https://slots.toulelabs.dev")
+    first = (name or "there").split(" ")[0]
+    text = (
+        f"Hi {first},\n\n"
+        "Quick update: we rebuilt the trickiest part of Visa Slot Monitor's setup.\n\n"
+        "The Telegram credentials step now has a guided, 4-step walkthrough — "
+        "exactly where to click on my.telegram.org, what to type, and what to "
+        "copy. What used to confuse almost everyone now takes about 2 minutes.\n\n"
+        f"Your account is already created — finish setup here: {app_url}\n\n"
+        "Once done, your radar scans checkvisaslots.com and Telegram channels "
+        "24/7 and pings your Telegram the instant F1 visa slots open.\n\n"
+        "— Toule Labs · Visa Slot Monitor"
+    )
+    html = f"""\
+<div style="margin:0;padding:0;background-color:#0d0a16;">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#0d0a16" style="background-color:#0d0a16;">
+  <tr><td align="center" style="padding:40px 16px;">
+    <table role="presentation" width="520" cellpadding="0" cellspacing="0" border="0" style="max-width:520px;width:100%;">
+      <!-- header badge -->
+      <tr><td align="center" style="padding-bottom:24px;">
+        <span style="display:inline-block;padding:8px 18px;border:1px solid #2d2447;border-radius:999px;
+                     font-family:Arial,Helvetica,sans-serif;font-size:12px;letter-spacing:3px;color:#a78bfa;">
+          &#128225;&nbsp; TOULE LABS &middot; UPDATE
+        </span>
+      </td></tr>
+      <!-- card -->
+      <tr><td style="background-color:#161022;border:1px solid #2d2447;border-radius:20px;padding:44px 36px;" align="center">
+        <p style="margin:0;font-family:'Courier New',monospace;font-size:13px;letter-spacing:4px;color:#a78bfa;">
+          &gt;&gt; SETUP, REBUILT &lt;&lt;
+        </p>
+        <h1 style="margin:18px 0 0;font-family:Arial,Helvetica,sans-serif;font-weight:800;font-size:34px;line-height:1.15;color:#f6f2ff;">
+          {first}, setup just got<br>
+          <span style="color:#a78bfa;">way easier</span>
+        </h1>
+        <p style="margin:20px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#a99bc6;">
+          The Telegram credentials step tripped almost everyone up &mdash; so we
+          rebuilt it. There's now a guided 4-step walkthrough: exactly where to
+          click, what to type, what to copy. About 2 minutes, start to finish.
+        </p>
+        <p style="margin:16px 0 0;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:1.6;color:#a99bc6;">
+          Your account is already created &mdash; pick up where you left off and
+          your radar starts hunting F1 slots for you, 24/7.
+        </p>
+        <!-- CTA -->
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:32px auto 0;">
+          <tr><td align="center" bgcolor="#a78bfa" style="border-radius:14px;">
+            <a href="{app_url}" style="display:inline-block;padding:15px 34px;font-family:Arial,Helvetica,sans-serif;
+               font-size:16px;font-weight:bold;color:#1d1147;text-decoration:none;">
+              Finish setup &nbsp;&rarr;
+            </a>
+          </td></tr>
+        </table>
+        <p style="margin:26px 0 0;font-family:'Courier New',monospace;font-size:12px;letter-spacing:2px;color:#584a7d;">
+          GUIDED WALKTHROUGH &middot; 5-MIN TOTAL &middot; ALERTS ON TELEGRAM
+        </p>
+      </td></tr>
+      <!-- footer -->
+      <tr><td align="center" style="padding-top:26px;font-family:Arial,Helvetica,sans-serif;font-size:12px;color:#584a7d;">
+        Toule Labs &middot; tiny lab, ridiculously useful tools<br>
+        <a href="https://toulelabs.dev" style="color:#a78bfa;text-decoration:none;">toulelabs.dev</a>
+      </td></tr>
+    </table>
+  </td></tr>
+</table>
+</div>"""
+    subject = (f"📡 {first}, setup just got way easier — your radar is 5 minutes away"
+               if first != "there" else "📡 Setup just got way easier — your radar is 5 minutes away")
+    return send_email(to, subject, text, html=html)
+
+
 def send_welcome(to: str, name: str | None) -> None:
     """First-signup welcome — same visual family as send_access_email, with a
     cyan accent (green = access granted, amber = nudge, cyan = welcome)."""
