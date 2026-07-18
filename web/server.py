@@ -29,7 +29,7 @@ from telethon.errors import (
     SessionPasswordNeededError)
 
 from web import auth, mailer, tgbot
-from web.db import Alert, CvsCheck, Session, TgEvent, User, Waitlist, init_db
+from web.db import Alert, CvsCheck, Session, SignupLog, TgEvent, User, Waitlist, init_db
 
 BASE_DIR = Path(__file__).parent.parent
 DATA_DIR = Path(os.environ.get("DATA_DIR", str(BASE_DIR)))
@@ -422,7 +422,8 @@ async def public_stats():
     """Aggregate, non-sensitive metrics for the toulelabs.dev homepage."""
     from sqlalchemy import func as safunc
     async with Session() as s:
-        users = (await s.execute(select(safunc.count(User.id)))).scalar_one()
+        # All-time signups (never shrinks when test accounts are removed).
+        users = (await s.execute(select(safunc.count(SignupLog.id)))).scalar_one()
         alerts = (await s.execute(select(safunc.count(Alert.id)))).scalar_one()
         sweeps = (await s.execute(select(safunc.count(CvsCheck.id)))).scalar_one()
         signals = (await s.execute(select(safunc.count(TgEvent.id)))).scalar_one()
@@ -476,7 +477,8 @@ async def auth_callback(request: Request):
         if existing is None:
             from sqlalchemy import func as sqlfunc
             count = (await s.execute(select(sqlfunc.count(User.id)))).scalar_one()
-            if count >= MAX_USERS:
+            # Admin accounts are always allowed in, cap or no cap.
+            if count >= MAX_USERS and info.get("email", "").lower() not in ADMIN_EMAILS:
                 return RedirectResponse("/?error=full")
     user = await auth.upsert_user(
         google_sub=info["sub"], email=info.get("email", ""),

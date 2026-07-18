@@ -82,6 +82,18 @@ class TgEvent(Base):
     verdict: Mapped[str] = mapped_column(String(16), default="pending", server_default="pending")
 
 
+class SignupLog(Base):
+    """Every account that ever signed up, keyed by Google sub. Never deleted —
+    the homepage 'users' metric counts this, so removing an account (e.g. the
+    founder's own test logins) doesn't shrink the public number."""
+    __tablename__ = "signup_log"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    google_sub: Mapped[str] = mapped_column(String(255), unique=True, index=True)
+    email: Mapped[str] = mapped_column(String(320))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class Waitlist(Base):
     __tablename__ = "waitlist"
 

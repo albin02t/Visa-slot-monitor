@@ -80,6 +80,12 @@ async def upsert_user(google_sub: str, email: str, name: str | None, picture: st
         if user is None:
             user = User(google_sub=google_sub, email=email, name=name, picture=picture, config={})
             s.add(user)
+            # Permanent all-time signup record (survives account deletion).
+            from web.db import SignupLog
+            seen = (await s.execute(select(SignupLog).where(
+                SignupLog.google_sub == google_sub))).scalar_one_or_none()
+            if seen is None:
+                s.add(SignupLog(google_sub=google_sub, email=email))
         else:
             user.email = email
             user.name = name
