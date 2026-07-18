@@ -475,11 +475,24 @@ async def auth_callback(request: Request):
         existing = (await s.execute(
             select(User).where(User.google_sub == info["sub"]))).scalar_one_or_none()
         if existing is None:
-            from sqlalchemy import func as sqlfunc
-            count = (await s.execute(select(sqlfunc.count(User.id)))).scalar_one()
-            # Admin accounts are always allowed in, cap or no cap.
-            if count >= MAX_USERS and info.get("email", "").lower() not in ADMIN_EMAILS:
-                return RedirectResponse("/?error=full")
+            email_l = info.get("email", "").lower()
+            if email_l not in ADMIN_EMAILS:
+                from sqlalchemy import func as sqlfunc
+                invited = (await s.execute(select(Waitlist).where(
+                    sqlfunc.lower(Waitlist.email) == email_l,
+                    Waitlist.invited_at.is_not(None)))).scalar_one_or_none()
+                # An invitation reserved this person's seat — always honor it.
+                if invited is None:
+                    count = (await s.execute(select(sqlfunc.count(User.id)))).scalar_one()
+                    # Seats promised to invited-but-not-yet-signed-up people are
+                    # taken: walk-ins can't claim them.
+                    user_emails = {e.lower() for (e,) in
+                                   (await s.execute(select(User.email))).all()}
+                    pending = sum(1 for (e,) in (await s.execute(
+                        select(Waitlist.email).where(Waitlist.invited_at.is_not(None)))).all()
+                        if e.lower() not in user_emails)
+                    if count + pending >= MAX_USERS:
+                        return RedirectResponse("/?error=full")
     user = await auth.upsert_user(
         google_sub=info["sub"], email=info.get("email", ""),
         name=info.get("name"), picture=info.get("picture"))
